@@ -1,0 +1,817 @@
+openapi: 3.1.0
+info:
+  title: GymFlow API
+  version: 0.1.0
+  description: Gym Business Operating System — REST API
+
+servers:
+  - url: http://localhost:3000
+    description: Development
+  - url: https://api.gymflow.app
+    description: Production
+
+# ─── Reusable Components ────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ── Envelope ──
+    SuccessResponse:
+      type: object
+      properties:
+        success: { type: boolean, const: true }
+        data: { type: object }
+        meta:
+          type: object
+          properties:
+            total: { type: integer }
+            page: { type: integer }
+            totalPages: { type: integer }
+            hasMore: { type: boolean }
+
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, const: false }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: object
+              additionalProperties:
+                type: array
+                items: { type: string }
+
+    # ── Money ──
+    Money:
+      type: string
+      pattern: '^\d+\.\d{2}$'
+      description: Monetary value as string with 2 decimal places
+      example: "1500.00"
+
+    # ── Common ──
+    UUID:
+      type: string
+      format: uuid
+      example: "c79f4fb6-f1d4-4a9d-8ae9-e4c0fa75a3bf"
+
+    DateString:
+      type: string
+      format: date
+      pattern: '^\d{4}-\d{2}-\d{2}$'
+      example: "2026-06-05"
+
+    Timestamp:
+      type: string
+      format: date-time
+      example: "2026-06-05T18:58:23.949Z"
+
+    # ── Enums ──
+    UserRole:
+      type: string
+      enum: [owner, receptionist, trainer]
+
+    MemberStatus:
+      type: string
+      enum: [active, expired, inactive, frozen]
+
+    MembershipStatus:
+      type: string
+      enum: [active, expired, cancelled, frozen]
+
+    PaymentMethod:
+      type: string
+      enum: [cash, upi, card, bank_transfer]
+
+    PaymentStatus:
+      type: string
+      enum: [paid, partial, pending, refunded]
+
+    Gender:
+      type: string
+      enum: [male, female, other]
+
+    ReportPeriod:
+      type: string
+      enum: [today, this_week, this_month, last_month, this_year, all_time, custom]
+
+    # ── Entities ──
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: string, example: "15m" }
+
+    AuthUser:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/UserRole' }
+        gymId: { $ref: '#/components/schemas/UUID' }
+        phone: { type: string, nullable: true }
+        isActive: { type: boolean }
+        lastLoginAt: { $ref: '#/components/schemas/Timestamp' }
+        createdAt: { $ref: '#/components/schemas/Timestamp' }
+
+    Member:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string, nullable: true }
+        gender: { $ref: '#/components/schemas/Gender' }
+        dateOfBirth: { $ref: '#/components/schemas/DateString' }
+        address: { type: string, nullable: true }
+        emergencyContactName: { type: string, nullable: true }
+        emergencyContactPhone: { type: string, nullable: true }
+        photoUrl: { type: string, nullable: true }
+        joinDate: { $ref: '#/components/schemas/DateString' }
+        status: { $ref: '#/components/schemas/MemberStatus' }
+        createdAt: { $ref: '#/components/schemas/Timestamp' }
+        updatedAt: { $ref: '#/components/schemas/Timestamp' }
+        createdByName: { type: string, nullable: true }
+
+    MemberListItem:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        name: { type: string }
+        phone: { type: string }
+        email: { type: string, nullable: true }
+        gender: { $ref: '#/components/schemas/Gender' }
+        joinDate: { $ref: '#/components/schemas/DateString' }
+        status: { $ref: '#/components/schemas/MemberStatus' }
+        photoUrl: { type: string, nullable: true }
+        createdAt: { $ref: '#/components/schemas/Timestamp' }
+
+    MemberNote:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        content: { type: string }
+        createdAt: { $ref: '#/components/schemas/Timestamp' }
+        createdByName: { type: string, nullable: true }
+
+    MembershipPlan:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        gymId: { $ref: '#/components/schemas/UUID' }
+        name: { type: string }
+        durationDays: { type: integer }
+        price: { $ref: '#/components/schemas/Money' }
+        description: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { $ref: '#/components/schemas/Timestamp' }
+        updatedAt: { $ref: '#/components/schemas/Timestamp' }
+
+    Membership:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        memberId: { $ref: '#/components/schemas/UUID' }
+        planId: { $ref: '#/components/schemas/UUID' }
+        planName: { type: string }
+        startDate: { $ref: '#/components/schemas/DateString' }
+        endDate: { $ref: '#/components/schemas/DateString' }
+        status: { $ref: '#/components/schemas/MembershipStatus' }
+        totalAmount: { $ref: '#/components/schemas/Money' }
+        discountAmount: { $ref: '#/components/schemas/Money' }
+        paidAmount: { $ref: '#/components/schemas/Money' }
+        outstandingAmount: { $ref: '#/components/schemas/Money' }
+        notes: { type: string, nullable: true }
+        createdAt: { $ref: '#/components/schemas/Timestamp' }
+        updatedAt: { $ref: '#/components/schemas/Timestamp' }
+
+    Payment:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        memberId: { $ref: '#/components/schemas/UUID' }
+        memberName: { type: string }
+        memberPhone: { type: string }
+        membershipId: { $ref: '#/components/schemas/UUID' }
+        planName: { type: string, nullable: true }
+        receiptNumber: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+        paymentStatus: { $ref: '#/components/schemas/PaymentStatus' }
+        paymentDate: { $ref: '#/components/schemas/DateString' }
+        notes: { type: string, nullable: true }
+        createdAt: { $ref: '#/components/schemas/Timestamp' }
+        gymName: { type: string }
+        gymAddress: { type: string, nullable: true }
+        gymPhone: { type: string, nullable: true }
+
+    ExpenseCategory:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        gymId: { $ref: '#/components/schemas/UUID' }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        isActive: { type: boolean }
+        createdAt: { $ref: '#/components/schemas/Timestamp' }
+
+    Expense:
+      type: object
+      properties:
+        id: { $ref: '#/components/schemas/UUID' }
+        categoryId: { $ref: '#/components/schemas/UUID' }
+        categoryName: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+        description: { type: string, nullable: true }
+        expenseDate: { $ref: '#/components/schemas/DateString' }
+        paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+        receiptUrl: { type: string, nullable: true }
+        createdAt: { $ref: '#/components/schemas/Timestamp' }
+        updatedAt: { $ref: '#/components/schemas/Timestamp' }
+        createdByName: { type: string, nullable: true }
+
+# ─── API Contract Summary (for frontend reference) ────────────
+# All money values: string "1500.00" (2 decimal places)
+# All dates:        string "2026-06-05" (YYYY-MM-DD)
+# All timestamps:   string "2026-06-05T18:58:23.949Z" (ISO 8601)
+# All IDs:          string UUID
+# All envelopes:    { success: true, data: {...}, meta?: {...} }
+# All errors:       { success: false, error: { code, message, details? } }
+# Pagination:       { page, limit } → meta: { total, page, totalPages, hasMore }
+
+paths:
+  # ═══════════════════════════════════════════════════════════════
+  # AUTH (6 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh token (rotates)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (revoke refresh token)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+
+  /api/v1/auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Logout all devices
+      security: [{ BearerAuth: [] }]
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      security: [{ BearerAuth: [] }]
+
+  /api/v1/auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change password (revokes all sessions)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, minLength: 8 }
+                newPassword: { type: string, minLength: 8 }
+
+  # ═══════════════════════════════════════════════════════════════
+  # MEMBERS (8 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/members:
+    get:
+      tags: [Members]
+      summary: List members (paginated, filterable, sortable)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/MemberStatus' } }
+        - { name: search, in: query, schema: { type: string }, description: "Search by name or phone" }
+        - { name: sortBy, in: query, schema: { type: string, enum: [name, joinDate, createdAt], default: createdAt } }
+        - { name: sortOrder, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
+    post:
+      tags: [Members]
+      summary: Create member
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone, joinDate]
+              properties:
+                name: { type: string, minLength: 2 }
+                phone: { type: string, pattern: '^\+?[0-9]{10,15}$' }
+                email: { type: string, format: email, nullable: true }
+                gender: { $ref: '#/components/schemas/Gender' }
+                dateOfBirth: { $ref: '#/components/schemas/DateString' }
+                address: { type: string }
+                emergencyContactName: { type: string }
+                emergencyContactPhone: { type: string }
+                joinDate: { $ref: '#/components/schemas/DateString' }
+
+  /api/v1/members/{id}:
+    get:
+      tags: [Members]
+      summary: Get member detail
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { $ref: '#/components/schemas/UUID' } }
+    patch:
+      tags: [Members]
+      summary: Update member
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+
+  /api/v1/members/{id}/status:
+    patch:
+      tags: [Members]
+      summary: Change member status
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/MemberStatus' }
+                reason: { type: string }
+
+  /api/v1/members/{id}/notes:
+    post:
+      tags: [Members]
+      summary: Add note to member
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 1, maxLength: 2000 }
+    get:
+      tags: [Members]
+      summary: List member notes
+      security: [{ BearerAuth: [] }]
+
+  /api/v1/members/{id}/notes/{noteId}:
+    delete:
+      tags: [Members]
+      summary: Delete note
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+
+  # ═══════════════════════════════════════════════════════════════
+  # MEMBERSHIP PLANS (5 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/membership-plans:
+    get:
+      tags: [Plans]
+      summary: List plans
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: includeInactive, in: query, schema: { type: boolean } }
+    post:
+      tags: [Plans]
+      summary: Create plan
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, durationDays, price]
+              properties:
+                name: { type: string }
+                durationDays: { type: integer, minimum: 1 }
+                price: { type: number, minimum: 0 }
+                description: { type: string }
+                sortOrder: { type: integer, default: 0 }
+
+  /api/v1/membership-plans/{id}:
+    get:
+      tags: [Plans]
+      summary: Get plan
+      security: [{ BearerAuth: [] }]
+    patch:
+      tags: [Plans]
+      summary: Update plan
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+
+  /api/v1/membership-plans/{id}/status:
+    patch:
+      tags: [Plans]
+      summary: Toggle plan active/inactive
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isActive]
+              properties:
+                isActive: { type: boolean }
+
+  # ═══════════════════════════════════════════════════════════════
+  # MEMBERSHIPS (6 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/members/{memberId}/memberships:
+    post:
+      tags: [Memberships]
+      summary: Create membership for member
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [planId, startDate]
+              properties:
+                planId: { $ref: '#/components/schemas/UUID' }
+                startDate: { $ref: '#/components/schemas/DateString' }
+                discountAmount: { type: number, default: 0 }
+                notes: { type: string }
+    get:
+      tags: [Memberships]
+      summary: List membership history for member
+      security: [{ BearerAuth: [] }]
+
+  /api/v1/memberships/{id}:
+    get:
+      tags: [Memberships]
+      summary: Get membership detail (includes freeze history + outstanding)
+      security: [{ BearerAuth: [] }]
+
+  /api/v1/memberships/{id}/renew:
+    post:
+      tags: [Memberships]
+      summary: Renew membership (creates new, expires current)
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [planId, startDate]
+              properties:
+                planId: { $ref: '#/components/schemas/UUID' }
+                startDate: { $ref: '#/components/schemas/DateString' }
+                discountAmount: { type: number, default: 0 }
+                notes: { type: string }
+
+  /api/v1/memberships/{id}/freeze:
+    post:
+      tags: [Memberships]
+      summary: Freeze membership
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [freezeStart]
+              properties:
+                freezeStart: { $ref: '#/components/schemas/DateString' }
+                freezeEnd: { $ref: '#/components/schemas/DateString' }
+                reason: { type: string }
+
+  /api/v1/memberships/{id}/unfreeze:
+    post:
+      tags: [Memberships]
+      summary: Unfreeze membership (extends end date by frozen days)
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unfreezeDate]
+              properties:
+                unfreezeDate: { $ref: '#/components/schemas/DateString' }
+
+  # ═══════════════════════════════════════════════════════════════
+  # PAYMENTS (7 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/payments:
+    post:
+      tags: [Payments]
+      summary: Record payment
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist. Cannot exceed outstanding balance."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberId, amount, paymentMethod, paymentDate]
+              properties:
+                memberId: { $ref: '#/components/schemas/UUID' }
+                membershipId: { $ref: '#/components/schemas/UUID' }
+                amount: { type: number, exclusiveMinimum: 0 }
+                paymentMethod: { $ref: '#/components/schemas/PaymentMethod' }
+                paymentDate: { $ref: '#/components/schemas/DateString' }
+                notes: { type: string }
+    get:
+      tags: [Payments]
+      summary: List payments (paginated, filterable)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+        - { name: memberId, in: query, schema: { $ref: '#/components/schemas/UUID' } }
+        - { name: membershipId, in: query, schema: { $ref: '#/components/schemas/UUID' } }
+        - { name: paymentMethod, in: query, schema: { $ref: '#/components/schemas/PaymentMethod' } }
+        - { name: dateFrom, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+        - { name: dateTo, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+        - { name: receiptNumber, in: query, schema: { type: string } }
+
+  /api/v1/payments/{id}:
+    get:
+      tags: [Payments]
+      summary: Get payment detail
+      security: [{ BearerAuth: [] }]
+
+  /api/v1/payments/{id}/receipt:
+    get:
+      tags: [Payments]
+      summary: Download PDF receipt
+      security: [{ BearerAuth: [] }]
+      responses:
+        200:
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /api/v1/memberships/{id}/payments:
+    get:
+      tags: [Payments]
+      summary: List payments for a membership
+      security: [{ BearerAuth: [] }]
+
+  /api/v1/members/{memberId}/payments:
+    get:
+      tags: [Payments]
+      summary: List all payments for a member
+      security: [{ BearerAuth: [] }]
+
+  # ═══════════════════════════════════════════════════════════════
+  # EXPENSE CATEGORIES (5 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/expense-categories:
+    get:
+      tags: [Expense Categories]
+      summary: List categories
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: includeInactive, in: query, schema: { type: boolean } }
+    post:
+      tags: [Expense Categories]
+      summary: Create category
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+
+  /api/v1/expense-categories/{id}:
+    get:
+      tags: [Expense Categories]
+      summary: Get category
+      security: [{ BearerAuth: [] }]
+    patch:
+      tags: [Expense Categories]
+      summary: Update category
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+
+  /api/v1/expense-categories/{id}/status:
+    patch:
+      tags: [Expense Categories]
+      summary: Toggle category active/inactive
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+
+  # ═══════════════════════════════════════════════════════════════
+  # EXPENSES (4 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/expenses:
+    post:
+      tags: [Expenses]
+      summary: Create expense
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+    get:
+      tags: [Expenses]
+      summary: List expenses (paginated, filterable, sortable)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+        - { name: categoryId, in: query, schema: { $ref: '#/components/schemas/UUID' } }
+        - { name: dateFrom, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+        - { name: dateTo, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: sortBy, in: query, schema: { type: string, enum: [expenseDate, amount, createdAt] } }
+        - { name: sortOrder, in: query, schema: { type: string, enum: [asc, desc] } }
+
+  /api/v1/expenses/{id}:
+    get:
+      tags: [Expenses]
+      summary: Get expense detail
+      security: [{ BearerAuth: [] }]
+    patch:
+      tags: [Expenses]
+      summary: Update expense
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner, receptionist"
+
+  # ═══════════════════════════════════════════════════════════════
+  # DASHBOARD (1 endpoint)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Dashboard KPIs
+      security: [{ BearerAuth: [] }]
+
+  # ═══════════════════════════════════════════════════════════════
+  # REPORTS (6 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/reports/revenue:
+    get:
+      tags: [Reports]
+      summary: Revenue report with payment method breakdown
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: period, in: query, required: true, schema: { $ref: '#/components/schemas/ReportPeriod' } }
+        - { name: from, in: query, schema: { $ref: '#/components/schemas/DateString' }, description: "Required when period=custom" }
+        - { name: to, in: query, schema: { $ref: '#/components/schemas/DateString' }, description: "Required when period=custom" }
+
+  /api/v1/reports/expenses:
+    get:
+      tags: [Reports]
+      summary: Expense report with category breakdown
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: period, in: query, required: true, schema: { $ref: '#/components/schemas/ReportPeriod' } }
+        - { name: from, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+        - { name: to, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+
+  /api/v1/reports/profit:
+    get:
+      tags: [Reports]
+      summary: Profit and loss report
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: period, in: query, required: true, schema: { $ref: '#/components/schemas/ReportPeriod' } }
+        - { name: from, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+        - { name: to, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+
+  /api/v1/reports/memberships:
+    get:
+      tags: [Reports]
+      summary: Membership status report + expiring list
+      security: [{ BearerAuth: [] }]
+
+  /api/v1/reports/outstanding-balances:
+    get:
+      tags: [Reports]
+      summary: Members with outstanding balances
+      security: [{ BearerAuth: [] }]
+
+  # ═══════════════════════════════════════════════════════════════
+  # AUTOMATION (4 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/automation/expiring-memberships:
+    get:
+      tags: [Automation]
+      summary: Memberships expiring in 1/3/7 days (for n8n)
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+
+  /api/v1/automation/expired-memberships:
+    get:
+      tags: [Automation]
+      summary: Expired memberships (for n8n follow-up)
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+
+  /api/v1/automation/daily-summary:
+    get:
+      tags: [Automation]
+      summary: Daily business summary (for n8n nightly report)
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+
+  /api/v1/automation/backup-status:
+    get:
+      tags: [Automation]
+      summary: Backup status (mock for V1)
+      security: [{ BearerAuth: [] }]
+      description: "Roles: owner"
+
+  # ═══════════════════════════════════════════════════════════════
+  # EXPORTS (8 endpoints)
+  # ═══════════════════════════════════════════════════════════════
+  /api/v1/exports/members.csv:
+    get: { tags: [Exports], summary: "Export members as CSV", security: [{ BearerAuth: [] }] }
+  /api/v1/exports/members.xlsx:
+    get: { tags: [Exports], summary: "Export members as Excel", security: [{ BearerAuth: [] }] }
+  /api/v1/exports/revenue.csv:
+    get:
+      tags: [Exports]
+      summary: "Export revenue as CSV"
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: period, in: query, schema: { $ref: '#/components/schemas/ReportPeriod' } }
+        - { name: from, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+        - { name: to, in: query, schema: { $ref: '#/components/schemas/DateString' } }
+  /api/v1/exports/revenue.xlsx:
+    get: { tags: [Exports], summary: "Export revenue as Excel", security: [{ BearerAuth: [] }] }
+  /api/v1/exports/expenses.csv:
+    get: { tags: [Exports], summary: "Export expenses as CSV", security: [{ BearerAuth: [] }] }
+  /api/v1/exports/expenses.xlsx:
+    get: { tags: [Exports], summary: "Export expenses as Excel", security: [{ BearerAuth: [] }] }
+  /api/v1/exports/outstanding-balances.csv:
+    get: { tags: [Exports], summary: "Export outstanding balances as CSV", security: [{ BearerAuth: [] }] }
+  /api/v1/exports/outstanding-balances.xlsx:
+    get: { tags: [Exports], summary: "Export outstanding balances as Excel", security: [{ BearerAuth: [] }] }
+
+  # ═══════════════════════════════════════════════════════════════
+  # HEALTH (2 endpoints — no auth required)
+  # ═══════════════════════════════════════════════════════════════
+  /health:
+    get: { tags: [Health], summary: "Server health + uptime" }
+  /health/db:
+    get: { tags: [Health], summary: "Database connectivity + latency" }

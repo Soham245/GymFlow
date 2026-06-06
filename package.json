@@ -1,0 +1,21 @@
+{
+  "name": "gymflow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "GymFlow — Gym Business Operating System",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @gymflow/api dev",
+    "build:api": "pnpm --filter @gymflow/api build",
+    "db:generate": "pnpm --filter @gymflow/db generate",
+    "db:migrate": "pnpm --filter @gymflow/db migrate",
+    "db:seed": "pnpm --filter @gymflow/db seed",
+    "db:studio": "pnpm --filter @gymflow/db studio",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r clean"
+  }
+}
