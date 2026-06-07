@@ -46,6 +46,11 @@ function buildEvents(
   payments: Payment[],
   notes: MemberNote[]
 ): TimelineEvent[] {
+  // Defensive: ensure all collections are actual arrays
+  const safeMemberships = Array.isArray(memberships) ? memberships : [];
+  const safePayments = Array.isArray(payments) ? payments : [];
+  const safeNotes = Array.isArray(notes) ? notes : [];
+
   const events: TimelineEvent[] = [];
 
   // Member created
@@ -62,7 +67,7 @@ function buildEvents(
   });
 
   // Memberships
-  for (const ms of memberships) {
+  for (const ms of safeMemberships) {
     events.push({
       id: `membership-${ms.id}`,
       type: "membership_created",
@@ -91,7 +96,7 @@ function buildEvents(
   }
 
   // Payments
-  for (const p of payments) {
+  for (const p of safePayments) {
     events.push({
       id: `payment-${p.id}`,
       type: "payment",
@@ -106,7 +111,7 @@ function buildEvents(
   }
 
   // Notes
-  for (const n of notes) {
+  for (const n of safeNotes) {
     events.push({
       id: `note-${n.id}`,
       type: "note",
@@ -134,10 +139,10 @@ export function MemberTimeline({ member }: MemberTimelineProps) {
   const memberships = useQuery({
     queryKey: queryKeys.memberships.member(member.id),
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Membership[]>>(
+      const res = await api.get<ApiResponse<{ memberships: Membership[] }>>(
         MEMBERSHIPS.MEMBER_LIST(member.id)
       );
-      return res.data.data;
+      return res.data.data.memberships;
     },
     staleTime: 60_000,
   });
@@ -145,10 +150,10 @@ export function MemberTimeline({ member }: MemberTimelineProps) {
   const payments = useQuery({
     queryKey: queryKeys.payments.member(member.id),
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Payment[]>>(
+      const res = await api.get<ApiResponse<{ payments: Payment[] }>>(
         PAYMENTS.MEMBER_PAYMENTS(member.id)
       );
-      return res.data.data;
+      return res.data.data.payments;
     },
     staleTime: 60_000,
   });
