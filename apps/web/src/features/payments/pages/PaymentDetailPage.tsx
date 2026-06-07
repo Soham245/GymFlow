@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Download,
-  Eye,
+  Pencil,
   User,
   FileText,
   Banknote,
@@ -92,8 +92,12 @@ export default function PaymentDetailPage() {
           <StatusBadge status={p.paymentStatus} />
         </div>
 
-        {/* ─── Receipt Actions ────────────────────── */}
+        {/* ─── Actions ────────────────────────────── */}
         <div className="mt-4 flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => navigate(ROUTES.PAYMENT_EDIT(id!))}>
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Button>
           <Button size="sm" variant="outline" onClick={handleDownloadReceipt}>
             <Download className="h-4 w-4" />
             Download PDF

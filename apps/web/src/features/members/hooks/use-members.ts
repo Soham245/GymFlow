@@ -188,3 +188,24 @@ export function useChangeStatus(memberId: string) {
     },
   });
 }
+
+// ─── Batch Delete Members ─────────────────────────────────────
+
+export function useBatchDeleteMembers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await api.post<ApiResponse<{ deleted: number }>>(
+        MEMBERS.BATCH_DELETE,
+        { ids }
+      );
+      return res.data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.members.all });
+      qc.invalidateQueries({ queryKey: queryKeys.memberships.all });
+      qc.invalidateQueries({ queryKey: queryKeys.payments.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+  });
+}

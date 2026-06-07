@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Users, Filter, ChevronDown, UserPlus } from "lucide-react";
-import { useMembers } from "../hooks/use-members";
+import { Search, Users, Filter, ChevronDown, UserPlus, Trash2, X } from "lucide-react";
+import { useMembers, useBatchDeleteMembers } from "../hooks/use-members";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePermission } from "@/hooks/use-permission";
@@ -14,6 +14,7 @@ import { ListSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
 import { formatDate, formatPhone, cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { MemberListItem } from "@/api/types";
 
 const STATUS_OPTIONS = [
@@ -36,6 +37,7 @@ export default function MembersListPage() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const canCreate = usePermission("members:create");
+  const isOwner = usePermission("members:delete");
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-driven filters
@@ -47,6 +49,12 @@ export default function MembersListPage() {
 
   const [searchInput, setSearchInput] = useState(search);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Batch selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+
+  const batchDelete = useBatchDeleteMembers();
 
   const filters = useMemo(
     () => ({
@@ -65,7 +73,7 @@ export default function MembersListPage() {
   // Pull-to-refresh
   const { containerRef, isRefreshing, pullDistance } = usePullToRefresh({
     onRefresh: useCallback(() => members.refetch().then(() => {}), [members]),
-    enabled: isMobile,
+    enabled: isMobile && !selectionMode,
   });
 
   // ── URL Param Helpers ──────────────────────────────────────
@@ -88,18 +96,60 @@ export default function MembersListPage() {
     updateParam("search", searchInput.trim());
   }
 
+  // ── Selection Helpers ─────────────────────────────────────
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    if (!members.data) return;
+    const allIds = members.data.items.map((m) => m.id);
+    setSelectedIds(new Set(allIds));
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  }
+
+  async function handleBatchDelete() {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (!window.confirm(`Delete ${count} member${count > 1 ? "s" : ""} and ALL their memberships, payments, and notes? This cannot be undone.`)) return;
+
+    try {
+      const result = await batchDelete.mutateAsync(Array.from(selectedIds));
+      toast.success(`${result.deleted} member${result.deleted > 1 ? "s" : ""} deleted`);
+      clearSelection();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error?.message ?? "Failed to delete members");
+    }
+  }
+
   return (
     <>
       <PageHeader
         title="Members"
         subtitle={members.data ? `${members.data.total} total` : undefined}
         actions={
-          canCreate ? (
-            <Button size="sm" onClick={() => navigate(ROUTES.MEMBER_NEW)}>
-              <UserPlus className="h-4 w-4" />
-              Add Member
-            </Button>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {isOwner && !selectionMode && members.data && members.data.items.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setSelectionMode(true)}>
+                Select
+              </Button>
+            )}
+            {canCreate && (
+              <Button size="sm" onClick={() => navigate(ROUTES.MEMBER_NEW)}>
+                <UserPlus className="h-4 w-4" />
+                Add Member
+              </Button>
+            )}
+          </div>
         }
         mobileActions={
           canCreate ? (
@@ -117,6 +167,37 @@ export default function MembersListPage() {
         <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
         <div className="p-4 md:p-6">
+          {/* ─── Selection Bar ────────────────────────────── */}
+          {selectionMode && (
+            <div className="mb-3 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={selectAll}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Select All
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={selectedIds.size === 0 || batchDelete.isPending}
+                  onClick={handleBatchDelete}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+                <button onClick={clearSelection} className="rounded p-1 hover:bg-accent">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ─── Search & Filters ─────────────────────────── */}
           <div className="space-y-3">
             {/* Search bar — always visible */}
@@ -230,7 +311,16 @@ export default function MembersListPage() {
                     <MemberRow
                       key={m.id}
                       member={m}
-                      onClick={() => navigate(ROUTES.MEMBER_DETAIL(m.id))}
+                      selectionMode={selectionMode}
+                      selected={selectedIds.has(m.id)}
+                      onToggle={() => toggleSelect(m.id)}
+                      onClick={() => {
+                        if (selectionMode) {
+                          toggleSelect(m.id);
+                        } else {
+                          navigate(ROUTES.MEMBER_DETAIL(m.id));
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -255,7 +345,19 @@ export default function MembersListPage() {
 
 // ─── Member Row ─────────────────────────────────────────────────
 
-function MemberRow({ member, onClick }: { member: MemberListItem; onClick: () => void }) {
+function MemberRow({
+  member,
+  selectionMode,
+  selected,
+  onToggle,
+  onClick,
+}: {
+  member: MemberListItem;
+  selectionMode: boolean;
+  selected: boolean;
+  onToggle: () => void;
+  onClick: () => void;
+}) {
   const initials = member.name
     .split(" ")
     .map((w) => w[0])
@@ -265,9 +367,31 @@ function MemberRow({ member, onClick }: { member: MemberListItem; onClick: () =>
 
   return (
     <button
-      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50 active:bg-accent"
+      className={cn(
+        "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50 active:bg-accent",
+        selected && "bg-primary/5"
+      )}
       onClick={onClick}
     >
+      {/* Checkbox */}
+      {selectionMode && (
+        <div
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          className={cn(
+            "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors",
+            selected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-muted-foreground/40"
+          )}
+        >
+          {selected && (
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </div>
+      )}
+
       {/* Avatar */}
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
         {initials}

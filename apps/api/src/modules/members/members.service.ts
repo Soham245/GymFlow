@@ -9,9 +9,17 @@ import {
   desc,
   count,
   sql,
+  inArray,
 } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { members, memberNotes, users } from "@gymflow/db";
+import {
+  members,
+  memberNotes,
+  users,
+  memberMemberships,
+  membershipFreezes,
+  payments,
+} from "@gymflow/db";
 import type { Database } from "@gymflow/db";
 import type {
   CreateMemberInput,
@@ -419,4 +427,79 @@ export async function deleteNote(
     ipAddress: ctx.ip,
     userAgent: ctx.userAgent,
   });
+}
+
+// ─── Batch Delete Members ──────────────────────────────────────
+
+export async function batchDeleteMembers(
+  ctx: ServiceContext,
+  memberIds: string[]
+) {
+  const { db, gymId, userId } = ctx;
+
+  if (memberIds.length === 0) return { deleted: 0 };
+  if (memberIds.length > 50) {
+    throw AppError.badRequest("Cannot delete more than 50 members at once");
+  }
+
+  // Verify all members belong to this gym
+  const existing = await db
+    .select({ id: members.id, name: members.name })
+    .from(members)
+    .where(and(eq(members.gymId, gymId), inArray(members.id, memberIds)));
+
+  if (existing.length !== memberIds.length) {
+    throw AppError.badRequest(
+      `Some member IDs are invalid or don't belong to this gym`
+    );
+  }
+
+  // Get membership IDs for these members (needed to delete freezes)
+  const membershipRows = await db
+    .select({ id: memberMemberships.id })
+    .from(memberMemberships)
+    .where(inArray(memberMemberships.memberId, memberIds));
+  const membershipIds = membershipRows.map((r) => r.id);
+
+  // Delete in FK-safe order: freezes → payments → memberships → notes → members
+  if (membershipIds.length > 0) {
+    await db
+      .delete(membershipFreezes)
+      .where(inArray(membershipFreezes.membershipId, membershipIds));
+  }
+
+  await db
+    .delete(payments)
+    .where(inArray(payments.memberId, memberIds));
+
+  if (membershipIds.length > 0) {
+    await db
+      .delete(memberMemberships)
+      .where(inArray(memberMemberships.id, membershipIds));
+  }
+
+  await db
+    .delete(memberNotes)
+    .where(inArray(memberNotes.memberId, memberIds));
+
+  await db
+    .delete(members)
+    .where(inArray(members.id, memberIds));
+
+  // Audit each deletion
+  for (const m of existing) {
+    await createAuditLog(db, {
+      gymId,
+      userId,
+      action: "member_deleted",
+      entityType: "member",
+      entityId: m.id,
+      oldValues: { name: m.name },
+      newValues: null,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+    });
+  }
+
+  return { deleted: existing.length };
 }

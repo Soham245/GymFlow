@@ -33,11 +33,13 @@ const MembershipDetailPage = lazy(() => import("@/features/memberships/pages/Mem
 const PaymentsListPage = lazy(() => import("@/features/payments/pages/PaymentsListPage"));
 const PaymentNewPage = lazy(() => import("@/features/payments/pages/PaymentNewPage"));
 const PaymentDetailPage = lazy(() => import("@/features/payments/pages/PaymentDetailPage"));
+const PaymentEditPage = lazy(() => import("@/features/payments/pages/PaymentEditPage"));
 
 // Expenses
 const ExpensesListPage = lazy(() => import("@/features/expenses/pages/ExpensesListPage"));
 const ExpenseNewPage = lazy(() => import("@/features/expenses/pages/ExpenseNewPage"));
 const ExpenseDetailPage = lazy(() => import("@/features/expenses/pages/ExpenseDetailPage"));
+const ExpenseEditPage = lazy(() => import("@/features/expenses/pages/ExpenseEditPage"));
 
 // Reports
 const ReportsIndexPage = lazy(() => import("@/features/reports/pages/ReportsIndexPage"));
@@ -133,6 +135,7 @@ function AppRoutes() {
               <Route index element={<PaymentsListPage />} />
               <Route path="new" element={<PaymentNewPage />} />
               <Route path=":id" element={<PaymentDetailPage />} />
+              <Route path=":id/edit" element={<PaymentEditPage />} />
             </Route>
 
             {/* Expenses */}
@@ -140,6 +143,7 @@ function AppRoutes() {
               <Route index element={<ExpensesListPage />} />
               <Route path="new" element={<ExpenseNewPage />} />
               <Route path=":id" element={<ExpenseDetailPage />} />
+              <Route path=":id/edit" element={<ExpenseEditPage />} />
             </Route>
 
             {/* Reports */}

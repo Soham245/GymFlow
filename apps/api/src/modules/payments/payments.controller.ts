@@ -45,6 +45,17 @@ export const memberPayments = asyncHandler(async (req: Request, res: Response) =
   sendSuccess(res, { payments: paymentList });
 });
 
+export const update = asyncHandler(async (req: Request, res: Response) => {
+  const payment = await svc.updatePayment(ctx(req), req.params.id!, req.body);
+  sendSuccess(res, { payment });
+});
+
+export const batchDelete = asyncHandler(async (req: Request, res: Response) => {
+  const { ids } = req.body;
+  const result = await svc.batchDeletePayments(ctx(req), ids);
+  sendSuccess(res, result);
+});
+
 export const downloadReceipt = asyncHandler(async (req: Request, res: Response) => {
   const payment = await svc.getPaymentById(ctx(req), req.params.id!);
 
