@@ -45,17 +45,26 @@ export default function MemberDetailPage() {
   const canFreeze = usePermission("memberships:freeze");
 
   // Fetch memberships for this member
-  const memberships = useQuery({
+  const membershipsQuery = useQuery({
     queryKey: queryKeys.memberships.member(id!),
     queryFn: async () => {
       const res = await api.get<ApiResponse<{ memberships: Membership[] }>>(
         MEMBERSHIPS.MEMBER_LIST(id!)
       );
-      return res.data.data.memberships;
+      // Defensive: handle both { memberships: [...] } and raw [...]
+      const d = res.data.data;
+      if (Array.isArray(d)) return d as Membership[];
+      if (d && typeof d === "object" && "memberships" in d) return d.memberships;
+      return [] as Membership[];
     },
     staleTime: 60_000,
     enabled: !!id,
   });
+
+  // Safely extract memberships array regardless of cached shape
+  const membershipsList: Membership[] = Array.isArray(membershipsQuery.data)
+    ? membershipsQuery.data
+    : [];
 
   // ─── Loading ──────────────────────────────────────────
   if (member.isLoading) {
@@ -92,11 +101,13 @@ export default function MemberDetailPage() {
 
   const m = member.data!;
   const memberName = m.name ?? "";
-  const activeMembership = memberships.data?.find((ms) => ms.status === "active");
-  const totalOutstanding = memberships.data?.reduce(
+  const memberPhone = m.phone ?? "";
+  const memberStatus = m.status ?? "inactive";
+  const activeMembership = membershipsList.find((ms) => ms.status === "active");
+  const totalOutstanding = membershipsList.reduce(
     (sum, ms) => sum + parseFloat(ms.outstandingAmount || "0"),
     0
-  ) ?? 0;
+  );
 
   const initials = memberName
     .split(" ")
@@ -146,14 +157,14 @@ export default function MemberDetailPage() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2 className="truncate text-lg font-bold">{memberName || "Unnamed"}</h2>
-              <StatusBadge status={m.status} />
+              <StatusBadge status={memberStatus} />
             </div>
             <a
               href={`tel:${m.phone}`}
               className="mt-0.5 flex items-center gap-1 text-sm text-primary"
             >
               <Phone className="h-3.5 w-3.5" />
-              {formatPhone(m.phone)}
+              {formatPhone(memberPhone)}
             </a>
             {m.email && (
               <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
@@ -169,12 +180,12 @@ export default function MemberDetailPage() {
           <InfoItem
             label="Current Plan"
             value={activeMembership?.planName ?? "None"}
-            loading={memberships.isLoading}
+            loading={membershipsQuery.isLoading}
           />
           <InfoItem
             label="Expiry Date"
             value={activeMembership ? formatDate(activeMembership.endDate) : "N/A"}
-            loading={memberships.isLoading}
+            loading={membershipsQuery.isLoading}
             highlight={
               activeMembership
                 ? daysUntil(activeMembership.endDate) <= 7
@@ -184,12 +195,12 @@ export default function MemberDetailPage() {
           <InfoItem
             label="Outstanding"
             value={`₹${totalOutstanding.toFixed(2)}`}
-            loading={memberships.isLoading}
+            loading={membershipsQuery.isLoading}
             highlight={totalOutstanding > 0}
           />
           <InfoItem
             label="Join Date"
-            value={formatDate(m.joinDate)}
+            value={m.joinDate ? formatDate(m.joinDate) : "N/A"}
           />
         </div>
 
@@ -224,7 +235,7 @@ export default function MemberDetailPage() {
               Freeze
             </Button>
           )}
-          {canChangeStatus && m.status !== "active" && (
+          {canChangeStatus && memberStatus !== "active" && (
             <Button
               size="sm"
               variant="outline"
@@ -258,7 +269,7 @@ export default function MemberDetailPage() {
         {/* ─── Tab Content ───────────────────────────── */}
         <div className="mt-4">
           {activeTab === "overview" && (
-            <OverviewTab member={m} memberships={memberships.data} membershipsLoading={memberships.isLoading} />
+            <OverviewTab member={m} memberships={membershipsList} membershipsLoading={membershipsQuery.isLoading} />
           )}
           {activeTab === "notes" && (
             <MemberNotes memberId={m.id} />
@@ -314,7 +325,7 @@ function OverviewTab({
   membershipsLoading,
 }: {
   member: NonNullable<ReturnType<typeof useMember>["data"]>;
-  memberships?: Membership[];
+  memberships: Membership[];
   membershipsLoading: boolean;
 }) {
   const navigate = useNavigate();
@@ -324,7 +335,7 @@ function OverviewTab({
       {/* Personal info */}
       <SectionCard title="Personal Information">
         <div className="grid grid-cols-2 gap-3">
-          <DetailRow label="Phone" value={formatPhone(member.phone)} />
+          <DetailRow label="Phone" value={formatPhone(member.phone ?? "")} />
           <DetailRow label="Email" value={member.email ?? "Not provided"} />
           <DetailRow label="Gender" value={capitalize(member.gender ?? "Not specified")} />
           <DetailRow
@@ -359,7 +370,7 @@ function OverviewTab({
               <Skeleton key={i} className="h-16 w-full rounded-lg" />
             ))}
           </div>
-        ) : !memberships || memberships.length === 0 ? (
+        ) : memberships.length === 0 ? (
           <EmptyState
             icon={AlertCircle}
             title="No memberships"
@@ -424,5 +435,6 @@ function daysUntil(dateStr: string): number {
 }
 
 function capitalize(s: string): string {
+  if (!s) return "";
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
 }

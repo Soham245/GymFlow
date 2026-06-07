@@ -197,5 +197,6 @@ export function MembershipTimeline({ membership }: MembershipTimelineProps) {
 }
 
 function capitalize(s: string): string {
+  if (!s) return "";
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
 }
