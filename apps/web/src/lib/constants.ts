@@ -4,6 +4,7 @@ export const ROUTES = {
   MEMBERS: "/members",
   MEMBER_DETAIL: (id: string) => `/members/${id}`,
   MEMBER_NEW: "/members/new",
+  MEMBER_EDIT: (id: string) => `/members/${id}/edit`,
   MEMBERSHIPS: "/memberships",
   MEMBERSHIP_DETAIL: (id: string) => `/memberships/${id}`,
   PAYMENTS: "/payments",

@@ -17,6 +17,11 @@ const APP_VERSION = "0.1.0";
 export function createApp() {
   const app = express();
 
+  // ─── Proxy Trust (required for Render, Railway, etc.) ────────
+  // Render terminates TLS and forwards requests via a reverse proxy.
+  // Without this, express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
+  app.set("trust proxy", 1);
+
   // ─── Request Logging ──────────────────────────────────────────
   app.use(
     pinoHttp({

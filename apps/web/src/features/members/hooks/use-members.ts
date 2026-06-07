@@ -67,8 +67,8 @@ export function useMember(memberId: string) {
   return useQuery({
     queryKey: queryKeys.members.detail(memberId),
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Member>>(MEMBERS.DETAIL(memberId));
-      return res.data.data;
+      const res = await api.get<ApiResponse<{ member: Member }>>(MEMBERS.DETAIL(memberId));
+      return res.data.data.member;
     },
     staleTime: 60_000,
     enabled: !!memberId,
@@ -81,8 +81,8 @@ export function useMemberNotes(memberId: string) {
   return useQuery({
     queryKey: queryKeys.members.notes(memberId),
     queryFn: async () => {
-      const res = await api.get<ApiResponse<MemberNote[]>>(MEMBERS.NOTES(memberId));
-      return res.data.data;
+      const res = await api.get<ApiResponse<{ notes: MemberNote[] }>>(MEMBERS.NOTES(memberId));
+      return res.data.data.notes;
     },
     staleTime: 60_000,
     enabled: !!memberId,
@@ -116,6 +116,27 @@ export function useCreateMember() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.members.all });
       qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+  });
+}
+
+// ─── Update Member ───────────────────────────────────────────
+
+export type UpdateMemberInput = Partial<CreateMemberInput>;
+
+export function useUpdateMember(memberId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdateMemberInput) => {
+      const res = await api.patch<ApiResponse<{ member: Member }>>(
+        MEMBERS.UPDATE(memberId),
+        input
+      );
+      return res.data.data.member;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.members.detail(memberId) });
+      qc.invalidateQueries({ queryKey: queryKeys.members.all });
     },
   });
 }

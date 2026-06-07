@@ -1,10 +1,12 @@
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TopBar } from "@/components/layout/TopBar";
 
 interface PageHeaderProps {
   /** Page title — shown in both mobile TopBar and desktop header */
   title: string;
-  /** Show mobile back button */
+  /** Show back button (mobile + desktop) */
   showBack?: boolean;
   /** Back button destination */
   backTo?: string;
@@ -26,6 +28,16 @@ export function PageHeader({
   mobileActions,
   className,
 }: PageHeaderProps) {
+  const navigate = useNavigate();
+
+  function handleBack() {
+    if (backTo) {
+      navigate(backTo);
+    } else {
+      navigate(-1);
+    }
+  }
+
   return (
     <>
       {/* Mobile header */}
@@ -33,11 +45,21 @@ export function PageHeader({
 
       {/* Desktop header */}
       <div className={cn("hidden md:flex md:items-center md:justify-between md:border-b md:px-6 md:py-4", className)}>
-        <div>
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          {subtitle && (
-            <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
+        <div className="flex items-center gap-3">
+          {showBack && (
+            <button
+              onClick={handleBack}
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
           )}
+          <div>
+            <h1 className="text-2xl font-semibold">{title}</h1>
+            {subtitle && (
+              <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
+            )}
+          </div>
         </div>
         {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>

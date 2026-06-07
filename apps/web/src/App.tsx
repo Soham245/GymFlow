@@ -22,6 +22,7 @@ const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPag
 const MembersListPage = lazy(() => import("@/features/members/pages/MembersListPage"));
 const MemberNewPage = lazy(() => import("@/features/members/pages/MemberNewPage"));
 const MemberDetailPage = lazy(() => import("@/features/members/pages/MemberDetailPage"));
+const MemberEditPage = lazy(() => import("@/features/members/pages/MemberEditPage"));
 
 // Memberships
 const MembershipsListPage = lazy(() => import("@/features/memberships/pages/MembershipsListPage"));
@@ -115,6 +116,7 @@ function AppRoutes() {
               <Route index element={<MembersListPage />} />
               <Route path="new" element={<MemberNewPage />} />
               <Route path=":id" element={<MemberDetailPage />} />
+              <Route path=":id/edit" element={<MemberEditPage />} />
             </Route>
 
             {/* Memberships */}

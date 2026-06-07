@@ -121,10 +121,10 @@ export function MembershipTimeline({ membership }: MembershipTimelineProps) {
   const payments = useQuery({
     queryKey: [...queryKeys.payments.detail(membership.id), "membership-payments"],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Payment[]>>(
+      const res = await api.get<ApiResponse<{ payments: Payment[] }>>(
         PAYMENTS.MEMBERSHIP_PAYMENTS(membership.id)
       );
-      return res.data.data;
+      return res.data.data.payments;
     },
     staleTime: 60_000,
   });

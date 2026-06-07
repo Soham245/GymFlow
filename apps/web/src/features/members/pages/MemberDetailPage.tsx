@@ -8,6 +8,7 @@ import {
   Snowflake,
   Play,
   AlertCircle,
+  Pencil,
 } from "lucide-react";
 import { useMember, useChangeStatus } from "../hooks/use-members";
 import { useQuery } from "@tanstack/react-query";
@@ -47,10 +48,10 @@ export default function MemberDetailPage() {
   const memberships = useQuery({
     queryKey: queryKeys.memberships.member(id!),
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Membership[]>>(
+      const res = await api.get<ApiResponse<{ memberships: Membership[] }>>(
         MEMBERSHIPS.MEMBER_LIST(id!)
       );
-      return res.data.data;
+      return res.data.data.memberships;
     },
     staleTime: 60_000,
     enabled: !!id,
@@ -90,15 +91,17 @@ export default function MemberDetailPage() {
   }
 
   const m = member.data!;
+  const memberName = m.name ?? "";
   const activeMembership = memberships.data?.find((ms) => ms.status === "active");
   const totalOutstanding = memberships.data?.reduce(
     (sum, ms) => sum + parseFloat(ms.outstandingAmount || "0"),
     0
   ) ?? 0;
 
-  const initials = m.name
+  const initials = memberName
     .split(" ")
     .map((w) => w[0])
+    .filter(Boolean)
     .slice(0, 2)
     .join("")
     .toUpperCase();
@@ -114,7 +117,25 @@ export default function MemberDetailPage() {
 
   return (
     <>
-      <PageHeader title={m.name} showBack backTo={ROUTES.MEMBERS} />
+      <PageHeader
+        title={memberName || "Member"}
+        showBack
+        backTo={ROUTES.MEMBERS}
+        actions={
+          <Button size="sm" variant="outline" onClick={() => navigate(ROUTES.MEMBER_EDIT(id!))}>
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Button>
+        }
+        mobileActions={
+          <button
+            onClick={() => navigate(ROUTES.MEMBER_EDIT(id!))}
+            className="rounded-md p-1.5 text-primary"
+          >
+            <Pencil className="h-5 w-5" />
+          </button>
+        }
+      />
 
       <div className="p-4 md:p-6">
         {/* ─── Member Header ──────────────────────────── */}
@@ -124,7 +145,7 @@ export default function MemberDetailPage() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="truncate text-lg font-bold">{m.name}</h2>
+              <h2 className="truncate text-lg font-bold">{memberName || "Unnamed"}</h2>
               <StatusBadge status={m.status} />
             </div>
             <a
