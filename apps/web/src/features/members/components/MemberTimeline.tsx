@@ -38,80 +38,108 @@ interface TimelineEvent {
   timestamp: number;
 }
 
+// ─── Safe Array Extraction ─────────────────────────────────────
+// The backend wraps lists in objects like { memberships: [...] },
+// { payments: [...] }, { notes: [...] }. React Query cache may
+// serve data from a different queryFn that extracted differently.
+// This helper handles every possible shape.
+
+function extractArray<T>(data: unknown, ...keys: string[]): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (data && typeof data === "object") {
+    for (const key of keys) {
+      const val = (data as Record<string, unknown>)[key];
+      if (Array.isArray(val)) return val as T[];
+    }
+    // Try common key names as fallback
+    for (const key of ["items", "data"]) {
+      const val = (data as Record<string, unknown>)[key];
+      if (Array.isArray(val)) return val as T[];
+    }
+  }
+  return [];
+}
+
 // ─── Build events from available data ──────────────────────────
 
 function buildEvents(
   member: Member,
-  memberships: Membership[],
-  payments: Payment[],
-  notes: MemberNote[]
+  rawMemberships: unknown,
+  rawPayments: unknown,
+  rawNotes: unknown
 ): TimelineEvent[] {
-  // Defensive: ensure all collections are actual arrays
-  const safeMemberships = Array.isArray(memberships) ? memberships : [];
-  const safePayments = Array.isArray(payments) ? payments : [];
-  const safeNotes = Array.isArray(notes) ? notes : [];
+  const memberships = extractArray<Membership>(rawMemberships, "memberships");
+  const payments = extractArray<Payment>(rawPayments, "payments");
+  const notes = extractArray<MemberNote>(rawNotes, "notes");
 
   const events: TimelineEvent[] = [];
 
   // Member created
-  events.push({
-    id: `member-created-${member.id}`,
-    type: "member_created",
-    icon: UserPlus,
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-700",
-    title: "Member registered",
-    subtitle: `Joined on ${formatDate(member.joinDate)}`,
-    date: member.createdAt,
-    timestamp: new Date(member.createdAt).getTime(),
-  });
+  if (member.createdAt) {
+    events.push({
+      id: `member-created-${member.id}`,
+      type: "member_created",
+      icon: UserPlus,
+      iconBg: "bg-blue-100",
+      iconColor: "text-blue-700",
+      title: "Member registered",
+      subtitle: member.joinDate ? `Joined on ${formatDate(member.joinDate)}` : undefined,
+      date: member.createdAt,
+      timestamp: new Date(member.createdAt).getTime(),
+    });
+  }
 
   // Memberships
-  for (const ms of safeMemberships) {
+  for (const ms of memberships) {
+    if (!ms || !ms.id) continue;
     events.push({
       id: `membership-${ms.id}`,
       type: "membership_created",
       icon: FileText,
       iconBg: "bg-purple-100",
       iconColor: "text-purple-700",
-      title: `${ms.planName} membership`,
-      subtitle: `${formatDate(ms.startDate)} - ${formatDate(ms.endDate)} · ${formatMoney(ms.totalAmount)}`,
-      date: ms.createdAt,
-      timestamp: new Date(ms.createdAt).getTime(),
+      title: `${ms.planName ?? "Unknown Plan"} membership`,
+      subtitle: `${ms.startDate ? formatDate(ms.startDate) : "?"} - ${ms.endDate ? formatDate(ms.endDate) : "?"} · ${formatMoney(ms.totalAmount ?? "0")}`,
+      date: ms.createdAt ?? "",
+      timestamp: ms.createdAt ? new Date(ms.createdAt).getTime() : 0,
     });
 
     // Show status-specific events
     if (ms.status === "frozen") {
+      const frozenDate = ms.updatedAt ?? ms.createdAt ?? "";
       events.push({
         id: `membership-frozen-${ms.id}`,
         type: "membership_frozen",
         icon: Snowflake,
         iconBg: "bg-sky-100",
         iconColor: "text-sky-700",
-        title: `${ms.planName} frozen`,
-        date: ms.updatedAt ?? ms.createdAt,
-        timestamp: new Date(ms.updatedAt ?? ms.createdAt).getTime(),
+        title: `${ms.planName ?? "Unknown Plan"} frozen`,
+        date: frozenDate,
+        timestamp: frozenDate ? new Date(frozenDate).getTime() : 0,
       });
     }
   }
 
   // Payments
-  for (const p of safePayments) {
+  for (const p of payments) {
+    if (!p || !p.id) continue;
     events.push({
       id: `payment-${p.id}`,
       type: "payment",
       icon: CreditCard,
       iconBg: "bg-green-100",
       iconColor: "text-green-700",
-      title: `Payment of ${formatMoney(p.amount)}`,
-      subtitle: `${p.receiptNumber} · ${capitalize(p.paymentMethod)}${p.planName ? ` · ${p.planName}` : ""}`,
-      date: p.createdAt,
-      timestamp: new Date(p.createdAt).getTime(),
+      title: `Payment of ${formatMoney(p.amount ?? "0")}`,
+      subtitle: `${p.receiptNumber ?? "—"} · ${capitalize(p.paymentMethod ?? "")}${p.planName ? ` · ${p.planName}` : ""}`,
+      date: p.createdAt ?? "",
+      timestamp: p.createdAt ? new Date(p.createdAt).getTime() : 0,
     });
   }
 
   // Notes
-  for (const n of safeNotes) {
+  for (const n of notes) {
+    if (!n || !n.id) continue;
+    const content = n.content ?? "";
     events.push({
       id: `note-${n.id}`,
       type: "note",
@@ -119,9 +147,9 @@ function buildEvents(
       iconBg: "bg-yellow-100",
       iconColor: "text-yellow-700",
       title: "Note added",
-      subtitle: n.content.length > 80 ? n.content.slice(0, 80) + "..." : n.content,
-      date: n.createdAt,
-      timestamp: new Date(n.createdAt).getTime(),
+      subtitle: content.length > 80 ? content.slice(0, 80) + "..." : content,
+      date: n.createdAt ?? "",
+      timestamp: n.createdAt ? new Date(n.createdAt).getTime() : 0,
     });
   }
 
@@ -142,7 +170,11 @@ export function MemberTimeline({ member }: MemberTimelineProps) {
       const res = await api.get<ApiResponse<{ memberships: Membership[] }>>(
         MEMBERSHIPS.MEMBER_LIST(member.id)
       );
-      return res.data.data.memberships;
+      // Defensive: handle both { memberships: [...] } and raw [...]
+      const d = res.data.data;
+      if (Array.isArray(d)) return d;
+      if (d && typeof d === "object" && "memberships" in d) return d.memberships;
+      return [];
     },
     staleTime: 60_000,
   });
@@ -153,7 +185,11 @@ export function MemberTimeline({ member }: MemberTimelineProps) {
       const res = await api.get<ApiResponse<{ payments: Payment[] }>>(
         PAYMENTS.MEMBER_PAYMENTS(member.id)
       );
-      return res.data.data.payments;
+      // Defensive: handle both { payments: [...] } and raw [...]
+      const d = res.data.data;
+      if (Array.isArray(d)) return d;
+      if (d && typeof d === "object" && "payments" in d) return d.payments;
+      return [];
     },
     staleTime: 60_000,
   });
@@ -190,11 +226,12 @@ export function MemberTimeline({ member }: MemberTimelineProps) {
     );
   }
 
+  // Pass raw data — buildEvents handles every shape defensively
   const events = buildEvents(
     member,
-    memberships.data ?? [],
-    payments.data ?? [],
-    notes.data ?? []
+    memberships.data,
+    payments.data,
+    notes.data
   );
 
   if (events.length === 0) {
@@ -229,9 +266,11 @@ export function MemberTimeline({ member }: MemberTimelineProps) {
             {event.subtitle && (
               <p className="mt-0.5 text-xs text-muted-foreground">{event.subtitle}</p>
             )}
-            <p className="mt-0.5 text-[10px] text-muted-foreground">
-              {formatDate(event.date)}
-            </p>
+            {event.date && (
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                {formatDate(event.date)}
+              </p>
+            )}
           </div>
         </div>
       ))}
@@ -240,5 +279,6 @@ export function MemberTimeline({ member }: MemberTimelineProps) {
 }
 
 function capitalize(s: string): string {
+  if (!s) return "";
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
 }

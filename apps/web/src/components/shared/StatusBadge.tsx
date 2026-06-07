@@ -11,8 +11,9 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
-  const colors = STATUS_COLORS[status] ?? "bg-gray-100 text-gray-800";
-  const displayLabel = label ?? status.charAt(0).toUpperCase() + status.slice(1);
+  const safeStatus = status ?? "active";
+  const colors = STATUS_COLORS[safeStatus] ?? "bg-gray-100 text-gray-800";
+  const displayLabel = label ?? (safeStatus ? safeStatus.charAt(0).toUpperCase() + safeStatus.slice(1) : "Unknown");
 
   return (
     <span
