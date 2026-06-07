@@ -2,27 +2,29 @@ export const queryKeys = {
   dashboard: ["dashboard"] as const,
   members: {
     all: ["members"] as const,
-    list: (filters: Record<string, unknown>) =>
+    list: (filters: object) =>
       ["members", "list", filters] as const,
     detail: (id: string) => ["members", "detail", id] as const,
     notes: (id: string) => ["members", "notes", id] as const,
   },
   memberships: {
     all: ["memberships"] as const,
+    list: (filters: object) =>
+      ["memberships", "list", filters] as const,
     member: (memberId: string) =>
       ["memberships", "member", memberId] as const,
     detail: (id: string) => ["memberships", "detail", id] as const,
   },
   payments: {
     all: ["payments"] as const,
-    list: (filters: Record<string, unknown>) =>
+    list: (filters: object) =>
       ["payments", "list", filters] as const,
     detail: (id: string) => ["payments", "detail", id] as const,
     member: (memberId: string) => ["payments", "member", memberId] as const,
   },
   expenses: {
     all: ["expenses"] as const,
-    list: (filters: Record<string, unknown>) =>
+    list: (filters: object) =>
       ["expenses", "list", filters] as const,
     detail: (id: string) => ["expenses", "detail", id] as const,
     categories: ["expenses", "categories"] as const,

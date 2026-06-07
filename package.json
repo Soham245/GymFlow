@@ -15,6 +15,7 @@
     "db:generate": "pnpm --filter @gymflow/db generate",
     "db:migrate": "pnpm --filter @gymflow/db migrate",
     "db:seed": "pnpm --filter @gymflow/db seed",
+    "db:reset": "pnpm --filter @gymflow/db reset",
     "db:studio": "pnpm --filter @gymflow/db studio",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",

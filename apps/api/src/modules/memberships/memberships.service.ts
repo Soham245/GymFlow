@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, or, ilike, sql, gte, lte, count as countFn, asc } from "drizzle-orm";
 import {
   memberMemberships,
   membershipPlans,
@@ -67,6 +67,119 @@ async function getActiveFreeze(db: Database, membershipId: string) {
     )
     .limit(1);
   return f ?? null;
+}
+
+// ─── List All Memberships ──────────────────────────────────────
+
+export interface ListMembershipsFilter {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+  planId?: string;
+  expiringSoon?: boolean;
+  sortBy?: string;
+  sortOrder?: string;
+}
+
+export async function listAllMemberships(ctx: Ctx, filters: ListMembershipsFilter = {}) {
+  const { db, gymId } = ctx;
+  const page = filters.page ?? 1;
+  const limit = Math.min(filters.limit ?? 20, 100);
+  const offset = (page - 1) * limit;
+
+  // Build conditions
+  const conditions = [eq(memberMemberships.gymId, gymId)];
+
+  if (filters.status) {
+    conditions.push(eq(memberMemberships.status, filters.status as "active" | "expired" | "cancelled" | "frozen"));
+  }
+
+  if (filters.planId) {
+    conditions.push(eq(memberMemberships.planId, filters.planId));
+  }
+
+  if (filters.search) {
+    conditions.push(
+      or(
+        ilike(members.name, `%${filters.search}%`),
+        ilike(members.phone, `%${filters.search}%`)
+      )!
+    );
+  }
+
+  if (filters.expiringSoon) {
+    const today = new Date().toISOString().split("T")[0]!;
+    const sevenDays = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]!;
+    conditions.push(gte(memberMemberships.endDate, today));
+    conditions.push(lte(memberMemberships.endDate, sevenDays));
+    conditions.push(eq(memberMemberships.status, "active"));
+  }
+
+  const where = and(...conditions);
+
+  // Count
+  const [{ total }] = await db
+    .select({ total: countFn() })
+    .from(memberMemberships)
+    .innerJoin(members, eq(memberMemberships.memberId, members.id))
+    .innerJoin(membershipPlans, eq(memberMemberships.planId, membershipPlans.id))
+    .where(where);
+
+  const totalCount = Number(total);
+  const totalPages = Math.ceil(totalCount / limit);
+
+  // Sort
+  let orderClause;
+  switch (filters.sortBy) {
+    case "endDate":
+      orderClause = filters.sortOrder === "asc" ? asc(memberMemberships.endDate) : desc(memberMemberships.endDate);
+      break;
+    case "startDate":
+      orderClause = filters.sortOrder === "asc" ? asc(memberMemberships.startDate) : desc(memberMemberships.startDate);
+      break;
+    case "memberName":
+      orderClause = filters.sortOrder === "asc" ? asc(members.name) : desc(members.name);
+      break;
+    default:
+      orderClause = desc(memberMemberships.createdAt);
+  }
+
+  // Query
+  const rows = await db
+    .select({
+      id: memberMemberships.id,
+      memberId: memberMemberships.memberId,
+      memberName: members.name,
+      memberPhone: members.phone,
+      planId: memberMemberships.planId,
+      planName: membershipPlans.name,
+      startDate: memberMemberships.startDate,
+      endDate: memberMemberships.endDate,
+      status: memberMemberships.status,
+      totalAmount: memberMemberships.totalAmount,
+      discountAmount: memberMemberships.discountAmount,
+      paidAmount: memberMemberships.paidAmount,
+      createdAt: memberMemberships.createdAt,
+    })
+    .from(memberMemberships)
+    .innerJoin(members, eq(memberMemberships.memberId, members.id))
+    .innerJoin(membershipPlans, eq(memberMemberships.planId, membershipPlans.id))
+    .where(where)
+    .orderBy(orderClause)
+    .limit(limit)
+    .offset(offset);
+
+  return {
+    items: rows.map((r) => ({
+      ...r,
+      outstandingAmount: toMoney(outstanding(r.totalAmount, r.discountAmount, r.paidAmount)),
+    })),
+    total: totalCount,
+    page,
+    totalPages,
+    hasMore: page < totalPages,
+  };
 }
 
 // ─── Create Membership ─────────────────────────────────────────

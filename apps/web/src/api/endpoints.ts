@@ -35,6 +35,7 @@ export const PLANS = {
 // ─── Memberships ───────────────────────────────────────────────
 
 export const MEMBERSHIPS = {
+  LIST: "/memberships",
   MEMBER_LIST: (memberId: string) => `/members/${memberId}/memberships`,
   CREATE: (memberId: string) => `/members/${memberId}/memberships`,
   DETAIL: (id: string) => `/memberships/${id}`,
