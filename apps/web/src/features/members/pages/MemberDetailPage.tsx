@@ -91,15 +91,17 @@ export default function MemberDetailPage() {
   }
 
   const m = member.data!;
+  const memberName = m.name ?? "";
   const activeMembership = memberships.data?.find((ms) => ms.status === "active");
   const totalOutstanding = memberships.data?.reduce(
     (sum, ms) => sum + parseFloat(ms.outstandingAmount || "0"),
     0
   ) ?? 0;
 
-  const initials = m.name
+  const initials = memberName
     .split(" ")
     .map((w) => w[0])
+    .filter(Boolean)
     .slice(0, 2)
     .join("")
     .toUpperCase();
@@ -116,7 +118,7 @@ export default function MemberDetailPage() {
   return (
     <>
       <PageHeader
-        title={m.name}
+        title={memberName || "Member"}
         showBack
         backTo={ROUTES.MEMBERS}
         actions={
@@ -143,7 +145,7 @@ export default function MemberDetailPage() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h2 className="truncate text-lg font-bold">{m.name}</h2>
+              <h2 className="truncate text-lg font-bold">{memberName || "Unnamed"}</h2>
               <StatusBadge status={m.status} />
             </div>
             <a
