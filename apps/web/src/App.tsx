@@ -7,6 +7,7 @@ import { AuthGuard } from "@/features/auth/AuthGuard";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageLoader } from "@/components/shared/PageLoader";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ROUTES } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
@@ -86,12 +87,14 @@ function GuestGuard() {
   return <LoginPage />;
 }
 
-/** Layout route that wraps child route output in Suspense for lazy chunks. */
+/** Layout route that wraps child route output in Suspense + ErrorBoundary. */
 function SuspenseOutlet() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Outlet />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <Outlet />
+      </Suspense>
+    </ErrorBoundary>
   );
 }
 
