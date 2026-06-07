@@ -8,6 +8,7 @@ import {
   Snowflake,
   Play,
   AlertCircle,
+  Pencil,
 } from "lucide-react";
 import { useMember, useChangeStatus } from "../hooks/use-members";
 import { useQuery } from "@tanstack/react-query";
@@ -47,10 +48,10 @@ export default function MemberDetailPage() {
   const memberships = useQuery({
     queryKey: queryKeys.memberships.member(id!),
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Membership[]>>(
+      const res = await api.get<ApiResponse<{ memberships: Membership[] }>>(
         MEMBERSHIPS.MEMBER_LIST(id!)
       );
-      return res.data.data;
+      return res.data.data.memberships;
     },
     staleTime: 60_000,
     enabled: !!id,
@@ -114,7 +115,25 @@ export default function MemberDetailPage() {
 
   return (
     <>
-      <PageHeader title={m.name} showBack backTo={ROUTES.MEMBERS} />
+      <PageHeader
+        title={m.name}
+        showBack
+        backTo={ROUTES.MEMBERS}
+        actions={
+          <Button size="sm" variant="outline" onClick={() => navigate(ROUTES.MEMBER_EDIT(id!))}>
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Button>
+        }
+        mobileActions={
+          <button
+            onClick={() => navigate(ROUTES.MEMBER_EDIT(id!))}
+            className="rounded-md p-1.5 text-primary"
+          >
+            <Pencil className="h-5 w-5" />
+          </button>
+        }
+      />
 
       <div className="p-4 md:p-6">
         {/* ─── Member Header ──────────────────────────── */}
