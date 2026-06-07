@@ -8,6 +8,7 @@ import {
   count,
   sum,
   sql,
+  inArray,
 } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import {
@@ -18,7 +19,7 @@ import {
   gyms,
 } from "@gymflow/db";
 import type { Database } from "@gymflow/db";
-import type { CreatePaymentInput, ListPaymentsQuery } from "@gymflow/shared";
+import type { CreatePaymentInput, UpdatePaymentInput, ListPaymentsQuery } from "@gymflow/shared";
 import { AppError } from "../../utils/app-error.js";
 import { createAuditLog } from "../../utils/audit.js";
 import { generateReceiptNumber } from "../../utils/receipt-number.js";
@@ -311,4 +312,148 @@ export async function listMemberPayments(ctx: Ctx, memberId: string) {
     .from(payments)
     .where(and(eq(payments.memberId, memberId), eq(payments.gymId, gymId)))
     .orderBy(desc(payments.createdAt));
+}
+
+// ─── Update Payment ────────────────────────────────────────────
+
+export async function updatePayment(ctx: Ctx, paymentId: string, input: UpdatePaymentInput) {
+  const { db, gymId, userId } = ctx;
+
+  // Get existing payment
+  const [existing] = await db
+    .select()
+    .from(payments)
+    .where(and(eq(payments.id, paymentId), eq(payments.gymId, gymId)))
+    .limit(1);
+
+  if (!existing) throw AppError.notFound("Payment");
+
+  const oldAmount = parseFloat(existing.amount);
+  const newAmount = input.amount ?? oldAmount;
+
+  // If amount changed and linked to a membership, adjust paidAmount
+  if (input.amount !== undefined && input.amount !== oldAmount && existing.membershipId) {
+    const diff = newAmount - oldAmount;
+    await db
+      .update(memberMemberships)
+      .set({
+        paidAmount: sql`GREATEST(${memberMemberships.paidAmount} + ${diff.toFixed(2)}::numeric, 0)`,
+        updatedAt: new Date(),
+      })
+      .where(eq(memberMemberships.id, existing.membershipId));
+  }
+
+  // Build update set
+  const updateSet: Record<string, unknown> = { updatedAt: new Date() };
+  if (input.amount !== undefined) updateSet.amount = String(input.amount);
+  if (input.paymentMethod !== undefined) updateSet.paymentMethod = input.paymentMethod;
+  if (input.paymentDate !== undefined) updateSet.paymentDate = input.paymentDate;
+  if (input.notes !== undefined) updateSet.notes = input.notes;
+
+  // Recalculate payment status if amount changed and membership linked
+  if (input.amount !== undefined && existing.membershipId) {
+    const [ms] = await db
+      .select({
+        totalAmount: memberMemberships.totalAmount,
+        discountAmount: memberMemberships.discountAmount,
+        paidAmount: memberMemberships.paidAmount,
+      })
+      .from(memberMemberships)
+      .where(eq(memberMemberships.id, existing.membershipId))
+      .limit(1);
+
+    if (ms) {
+      const netDue = Number(ms.totalAmount) - Number(ms.discountAmount);
+      updateSet.paymentStatus = Number(ms.paidAmount) >= netDue ? "paid" : "partial";
+    }
+  }
+
+  const [updated] = await db
+    .update(payments)
+    .set(updateSet)
+    .where(eq(payments.id, paymentId))
+    .returning();
+
+  await createAuditLog(db, {
+    gymId,
+    userId,
+    action: "payment_updated",
+    entityType: "payment",
+    entityId: paymentId,
+    oldValues: {
+      amount: existing.amount,
+      paymentMethod: existing.paymentMethod,
+      paymentDate: existing.paymentDate,
+      notes: existing.notes,
+    },
+    newValues: input,
+    ipAddress: ctx.ip,
+    userAgent: ctx.userAgent,
+  });
+
+  return updated;
+}
+
+// ─── Batch Delete Payments ──────────────────────────────────────
+
+export async function batchDeletePayments(ctx: Ctx, paymentIds: string[]) {
+  const { db, gymId, userId } = ctx;
+
+  if (paymentIds.length === 0) return { deleted: 0 };
+  if (paymentIds.length > 50) {
+    throw AppError.badRequest("Cannot delete more than 50 payments at once");
+  }
+
+  // Verify all payments belong to this gym
+  const existing = await db
+    .select({
+      id: payments.id,
+      receiptNumber: payments.receiptNumber,
+      amount: payments.amount,
+      memberId: payments.memberId,
+      membershipId: payments.membershipId,
+    })
+    .from(payments)
+    .where(and(eq(payments.gymId, gymId), inArray(payments.id, paymentIds)));
+
+  if (existing.length !== paymentIds.length) {
+    throw AppError.badRequest(
+      "Some payment IDs are invalid or don't belong to this gym"
+    );
+  }
+
+  // Reverse paidAmount on linked memberships
+  const membershipUpdates = new Map<string, number>();
+  for (const p of existing) {
+    if (p.membershipId) {
+      const current = membershipUpdates.get(p.membershipId) ?? 0;
+      membershipUpdates.set(p.membershipId, current + parseFloat(p.amount));
+    }
+  }
+  for (const [msId, amount] of membershipUpdates) {
+    await db
+      .update(memberMemberships)
+      .set({
+        paidAmount: sql`GREATEST(${memberMemberships.paidAmount} - ${amount.toFixed(2)}::numeric, 0)`,
+      })
+      .where(eq(memberMemberships.id, msId));
+  }
+
+  await db.delete(payments).where(inArray(payments.id, paymentIds));
+
+  for (const p of existing) {
+    await createAuditLog(db, {
+      gymId,
+      userId,
+      action: "payment_deleted",
+      entityType: "payment",
+      entityId: p.id,
+      oldValues: { receiptNumber: p.receiptNumber, amount: p.amount },
+      newValues: null,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+    });
+  }
+
+  return { deleted: existing.length };
 }

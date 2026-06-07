@@ -14,6 +14,7 @@ export const AUTH = {
 export const MEMBERS = {
   LIST: "/members",
   CREATE: "/members",
+  BATCH_DELETE: "/members/batch-delete",
   DETAIL: (id: string) => `/members/${id}`,
   UPDATE: (id: string) => `/members/${id}`,
   STATUS: (id: string) => `/members/${id}/status`,
@@ -49,7 +50,9 @@ export const MEMBERSHIPS = {
 export const PAYMENTS = {
   LIST: "/payments",
   CREATE: "/payments",
+  BATCH_DELETE: "/payments/batch-delete",
   DETAIL: (id: string) => `/payments/${id}`,
+  UPDATE: (id: string) => `/payments/${id}`,
   RECEIPT: (id: string) => `/payments/${id}/receipt`,
   MEMBERSHIP_PAYMENTS: (id: string) => `/memberships/${id}/payments`,
   MEMBER_PAYMENTS: (memberId: string) => `/members/${memberId}/payments`,

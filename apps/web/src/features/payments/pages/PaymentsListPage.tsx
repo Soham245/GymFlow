@@ -10,13 +10,14 @@ import {
   Smartphone,
   Building,
   Calendar,
+  Trash2,
+  X,
 } from "lucide-react";
-import { usePayments } from "../hooks/use-payments";
+import { usePayments, useBatchDeletePayments } from "../hooks/use-payments";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { usePermission } from "@/hooks/use-permission";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { PullToRefreshIndicator } from "@/components/shared/PullToRefreshIndicator";
@@ -24,6 +25,7 @@ import { ListSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
 import { formatDate, formatMoney, cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { PaymentListItem } from "@/api/types";
 
 const METHOD_OPTIONS = [
@@ -45,6 +47,7 @@ export default function PaymentsListPage() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const canCreate = usePermission("payments:create");
+  const isOwner = usePermission("payments:delete");
   const [searchParams, setSearchParams] = useSearchParams();
 
   // URL-driven filters
@@ -55,8 +58,13 @@ export default function PaymentsListPage() {
   const page = Number(searchParams.get("page") ?? "1");
 
   const [receiptInput, setReceiptInput] = useState(receiptSearch);
-  const [showFilters, setShowFilters] = useState(false);
   const [showDateFilter, setShowDateFilter] = useState(!!dateFrom || !!dateTo);
+
+  // Batch selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+
+  const batchDelete = useBatchDeletePayments();
 
   const filters = useMemo(
     () => ({
@@ -74,7 +82,7 @@ export default function PaymentsListPage() {
 
   const { containerRef, isRefreshing, pullDistance } = usePullToRefresh({
     onRefresh: useCallback(() => payments.refetch().then(() => {}), [payments]),
-    enabled: isMobile,
+    enabled: isMobile && !selectionMode,
   });
 
   function updateParam(key: string, value: string) {
@@ -92,6 +100,40 @@ export default function PaymentsListPage() {
     updateParam("receipt", receiptInput.trim());
   }
 
+  // ── Selection Helpers ─────────────────────────────────────
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    if (!payments.data) return;
+    setSelectedIds(new Set(payments.data.items.map((p) => p.id)));
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+  }
+
+  async function handleBatchDelete() {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (!window.confirm(`Delete ${count} payment${count > 1 ? "s" : ""}? This will also update linked membership balances. This cannot be undone.`)) return;
+
+    try {
+      const result = await batchDelete.mutateAsync(Array.from(selectedIds));
+      toast.success(`${result.deleted} payment${result.deleted > 1 ? "s" : ""} deleted`);
+      clearSelection();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error?.message ?? "Failed to delete payments");
+    }
+  }
+
   const hasFilters = !!receiptSearch || !!method || !!dateFrom || !!dateTo;
 
   return (
@@ -100,12 +142,19 @@ export default function PaymentsListPage() {
         title="Payments"
         subtitle={payments.data ? `${payments.data.total} total` : undefined}
         actions={
-          canCreate ? (
-            <Button size="sm" onClick={() => navigate(ROUTES.PAYMENT_NEW)}>
-              <Plus className="h-4 w-4" />
-              Record Payment
-            </Button>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {isOwner && !selectionMode && payments.data && payments.data.items.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setSelectionMode(true)}>
+                Select
+              </Button>
+            )}
+            {canCreate && (
+              <Button size="sm" onClick={() => navigate(ROUTES.PAYMENT_NEW)}>
+                <Plus className="h-4 w-4" />
+                Record Payment
+              </Button>
+            )}
+          </div>
         }
         mobileActions={
           canCreate ? (
@@ -123,6 +172,37 @@ export default function PaymentsListPage() {
         <PullToRefreshIndicator pullDistance={pullDistance} isRefreshing={isRefreshing} />
 
         <div className="p-4 md:p-6">
+          {/* ─── Selection Bar ────────────────────────────── */}
+          {selectionMode && (
+            <div className="mb-3 flex items-center justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={selectAll}
+                  className="text-xs font-medium text-primary hover:underline"
+                >
+                  Select All
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={selectedIds.size === 0 || batchDelete.isPending}
+                  onClick={handleBatchDelete}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+                <button onClick={clearSelection} className="rounded p-1 hover:bg-accent">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-3">
             {/* Search */}
             <form onSubmit={handleSearch} className="relative">
@@ -143,7 +223,6 @@ export default function PaymentsListPage() {
 
             {/* Filter row */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {/* Payment method chips */}
               {METHOD_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
@@ -161,7 +240,6 @@ export default function PaymentsListPage() {
 
               <div className="h-4 w-px bg-border" />
 
-              {/* Date filter toggle */}
               <button
                 onClick={() => setShowDateFilter(!showDateFilter)}
                 className={cn(
@@ -255,7 +333,16 @@ export default function PaymentsListPage() {
                     <PaymentRow
                       key={p.id}
                       payment={p}
-                      onClick={() => navigate(ROUTES.PAYMENT_DETAIL(p.id))}
+                      selectionMode={selectionMode}
+                      selected={selectedIds.has(p.id)}
+                      onToggle={() => toggleSelect(p.id)}
+                      onClick={() => {
+                        if (selectionMode) {
+                          toggleSelect(p.id);
+                        } else {
+                          navigate(ROUTES.PAYMENT_DETAIL(p.id));
+                        }
+                      }}
                     />
                   ))}
                 </div>
@@ -281,18 +368,46 @@ export default function PaymentsListPage() {
 
 function PaymentRow({
   payment,
+  selectionMode,
+  selected,
+  onToggle,
   onClick,
 }: {
   payment: PaymentListItem;
+  selectionMode: boolean;
+  selected: boolean;
+  onToggle: () => void;
   onClick: () => void;
 }) {
   const MethodIcon = METHOD_ICONS[payment.paymentMethod] ?? CreditCard;
 
   return (
     <button
-      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50 active:bg-accent"
+      className={cn(
+        "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50 active:bg-accent",
+        selected && "bg-primary/5"
+      )}
       onClick={onClick}
     >
+      {/* Checkbox */}
+      {selectionMode && (
+        <div
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          className={cn(
+            "flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors",
+            selected
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-muted-foreground/40"
+          )}
+        >
+          {selected && (
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </div>
+      )}
+
       {/* Method icon */}
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
         <MethodIcon className="h-5 w-5 text-primary" />
@@ -350,5 +465,6 @@ function Pagination({
 }
 
 function capitalize(s: string): string {
+  if (!s) return "";
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
 }

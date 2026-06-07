@@ -12,12 +12,17 @@ import {
   Wallet,
   UserCheck,
   ChevronRight,
+  Package,
+  Check,
 } from "lucide-react";
 import { useCreateMember } from "../hooks/use-members";
+import { usePlans } from "@/features/memberships/hooks/use-memberships";
+import { api } from "@/api/client";
+import { MEMBERSHIPS } from "@/api/endpoints";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
-import { cn } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Gender = "male" | "female" | "other";
@@ -122,11 +127,14 @@ function validate(form: FormData): FieldErrors {
 export default function MemberNewPage() {
   const navigate = useNavigate();
   const createMember = useCreateMember();
+  const plans = usePlans();
 
   const [form, setForm] = useState<FormData>(INITIAL);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [touched, setTouched] = useState<Set<keyof FormData>>(new Set());
   const [showOptional, setShowOptional] = useState(false);
+  // Plan selection (optional — assign package on creation)
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   // Post-creation success state
   const [createdMemberId, setCreatedMemberId] = useState<string | null>(null);
 
@@ -178,8 +186,23 @@ export default function MemberNewPage() {
       payload.emergencyContactPhone = form.emergencyContactPhone.trim();
 
     createMember.mutate(payload, {
-      onSuccess: (member) => {
+      onSuccess: async (member) => {
         toast.success("Member created successfully");
+
+        // If a plan was selected, also create the membership
+        if (selectedPlanId) {
+          try {
+            await api.post(MEMBERSHIPS.CREATE(member.id), {
+              planId: selectedPlanId,
+              startDate: form.joinDate,
+              discountAmount: 0,
+            });
+            toast.success("Membership plan assigned");
+          } catch {
+            toast.error("Member created but failed to assign plan. You can add it manually.");
+          }
+        }
+
         setCreatedMemberId(member.id);
       },
       onError: (err: any) => {
@@ -330,6 +353,82 @@ export default function MemberNewPage() {
                 className={fieldClass(touched.has("joinDate") && !!errors.joinDate)}
               />
             </FormField>
+          </fieldset>
+
+          {/* ── Package / Plan Selection ────────────────── */}
+          <fieldset className="space-y-3">
+            <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Membership Package
+            </legend>
+            <p className="text-xs text-muted-foreground">
+              Optionally assign a membership plan when creating this member.
+            </p>
+
+            {plans.isLoading ? (
+              <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading plans...
+              </div>
+            ) : plans.isError ? (
+              <p className="text-xs text-destructive">Failed to load plans</p>
+            ) : plans.data && plans.data.filter((p) => p.isActive).length > 0 ? (
+              <div className="space-y-2">
+                {plans.data
+                  .filter((p) => p.isActive)
+                  .map((plan) => (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() =>
+                        setSelectedPlanId(selectedPlanId === plan.id ? null : plan.id)
+                      }
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors",
+                        selectedPlanId === plan.id
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border bg-background hover:bg-accent/50"
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+                          selectedPlanId === plan.id
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-muted-foreground/40"
+                        )}
+                      >
+                        {selectedPlanId === plan.id && (
+                          <Check className="h-3 w-3" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{plan.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {plan.durationDays} days
+                          {plan.description && ` · ${plan.description}`}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-sm font-bold text-primary">
+                        {formatMoney(Number(plan.price))}
+                      </span>
+                    </button>
+                  ))}
+
+                {selectedPlanId && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPlanId(null)}
+                    className="text-xs text-muted-foreground hover:text-destructive hover:underline"
+                  >
+                    Clear selection (no package)
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-dashed bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                No active plans available. You can create plans in Settings.
+              </p>
+            )}
           </fieldset>
 
           {/* ── Optional Fields Toggle ──────────────────── */}

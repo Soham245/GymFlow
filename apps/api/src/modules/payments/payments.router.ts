@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createPaymentSchema,
+  updatePaymentSchema,
   listPaymentsSchema,
   idParamSchema,
 } from "@gymflow/shared";
@@ -24,10 +25,25 @@ paymentsRouter.get(
   controller.list
 );
 
+// Batch delete MUST be above /:id routes to avoid "batch-delete" matching as a UUID param
+paymentsRouter.post(
+  "/batch-delete",
+  authorize("owner"),
+  controller.batchDelete
+);
+
 paymentsRouter.get(
   "/:id",
   validate(idParamSchema, "params"),
   controller.getById
+);
+
+paymentsRouter.patch(
+  "/:id",
+  authorize("owner", "receptionist"),
+  validate(idParamSchema, "params"),
+  validate(updatePaymentSchema),
+  controller.update
 );
 
 paymentsRouter.get(

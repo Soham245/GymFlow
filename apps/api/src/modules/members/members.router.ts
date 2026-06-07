@@ -26,6 +26,13 @@ membersRouter.post(
   controller.create
 );
 
+// Batch delete MUST be above /:id routes to avoid "batch-delete" matching as a UUID param
+membersRouter.post(
+  "/batch-delete",
+  authorize("owner"),
+  controller.batchDelete
+);
+
 membersRouter.get(
   "/:id",
   validate(idParamSchema, "params"),

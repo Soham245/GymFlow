@@ -73,6 +73,7 @@ export const notificationStatusEnum = pgEnum("notification_status", [
 export const auditActionEnum = pgEnum("audit_action", [
   "member_created",
   "member_updated",
+  "member_deleted",
   "member_status_changed",
   "membership_created",
   "membership_renewed",
@@ -80,6 +81,8 @@ export const auditActionEnum = pgEnum("audit_action", [
   "membership_frozen",
   "membership_unfrozen",
   "payment_created",
+  "payment_updated",
+  "payment_deleted",
   "payment_voided",
   "expense_created",
   "expense_updated",

@@ -7,6 +7,7 @@ import {
   Building,
   ExternalLink,
   Tag,
+  Pencil,
 } from "lucide-react";
 import { useExpense } from "../hooks/use-expenses";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -59,7 +60,17 @@ export default function ExpenseDetailPage() {
 
   return (
     <>
-      <PageHeader title="Expense Detail" showBack backTo={ROUTES.EXPENSES} />
+      <PageHeader
+        title="Expense Detail"
+        showBack
+        backTo={ROUTES.EXPENSES}
+        actions={
+          <Button size="sm" variant="outline" onClick={() => navigate(ROUTES.EXPENSE_EDIT(id!))}>
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Button>
+        }
+      />
 
       <div className="p-4 md:p-6">
         {/* ─── Amount Hero ─────────────────────────── */}

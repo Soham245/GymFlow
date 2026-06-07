@@ -20,5 +20,13 @@ export const listPaymentsSchema = paginationSchema.extend({
   receiptNumber: z.string().max(50).optional(),
 });
 
+export const updatePaymentSchema = z.object({
+  amount: z.number().positive().optional(),
+  paymentMethod: z.enum(PAYMENT_METHODS).optional(),
+  paymentDate: dateStringSchema.optional(),
+  notes: z.string().max(500).optional().nullable(),
+});
+
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
+export type UpdatePaymentInput = z.infer<typeof updatePaymentSchema>;
 export type ListPaymentsQuery = z.infer<typeof listPaymentsSchema>;

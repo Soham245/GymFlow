@@ -3,11 +3,13 @@ import { useAuth } from "./use-auth";
 export type Action =
   | "members:create"
   | "members:edit"
+  | "members:delete"
   | "members:status"
   | "members:notes"
   | "memberships:create"
   | "memberships:freeze"
   | "payments:create"
+  | "payments:delete"
   | "payments:void"
   | "expenses:create"
   | "expenses:edit"
@@ -23,11 +25,13 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
   owner: [
     "members:create",
     "members:edit",
+    "members:delete",
     "members:status",
     "members:notes",
     "memberships:create",
     "memberships:freeze",
     "payments:create",
+    "payments:delete",
     "payments:void",
     "expenses:create",
     "expenses:edit",

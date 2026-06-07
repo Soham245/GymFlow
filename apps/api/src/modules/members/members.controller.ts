@@ -58,3 +58,9 @@ export const deleteNote = asyncHandler(async (req: Request, res: Response) => {
   await membersService.deleteNote(getContext(req), req.params.id!, req.params.noteId!);
   sendSuccess(res, { message: "Note deleted" });
 });
+
+export const batchDelete = asyncHandler(async (req: Request, res: Response) => {
+  const { ids } = req.body;
+  const result = await membersService.batchDeleteMembers(getContext(req), ids);
+  sendSuccess(res, result);
+});

@@ -100,6 +100,53 @@ export function useRecordPayment() {
   });
 }
 
+// ─── Update Payment ──────────────────────────────────────────
+
+interface UpdatePaymentInput {
+  amount?: number;
+  paymentMethod?: "cash" | "upi" | "card" | "bank_transfer";
+  paymentDate?: string;
+  notes?: string | null;
+}
+
+export function useUpdatePayment(paymentId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: UpdatePaymentInput) => {
+      const res = await api.patch(PAYMENTS.UPDATE(paymentId), input);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.payments.all });
+      qc.invalidateQueries({ queryKey: queryKeys.payments.detail(paymentId) });
+      qc.invalidateQueries({ queryKey: queryKeys.memberships.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.reports.outstanding });
+    },
+  });
+}
+
+// ─── Batch Delete Payments ────────────────────────────────────
+
+export function useBatchDeletePayments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await api.post<ApiResponse<{ deleted: number }>>(
+        PAYMENTS.BATCH_DELETE,
+        { ids }
+      );
+      return res.data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.payments.all });
+      qc.invalidateQueries({ queryKey: queryKeys.memberships.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.reports.outstanding });
+    },
+  });
+}
+
 // ─── Receipt URL helper ────────────────────────────────────────
 
 export function getReceiptUrl(paymentId: string): string {
