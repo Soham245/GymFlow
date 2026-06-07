@@ -9,14 +9,22 @@ import { hash } from "./hash-helper.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, "../../../../.env") });
 
-async function seed() {
+export async function seed() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
   const sql = neon(databaseUrl);
   const db = drizzle(sql, { schema });
 
-  console.log("Seeding database...\n");
+  console.log("Seeding database (non-destructive)...\n");
+
+  // ─── 0. Check if data already exists ────────────────────────
+  const existingGyms = await db.select().from(schema.gyms).limit(1);
+  if (existingGyms.length > 0) {
+    console.log("Database already has data — skipping seed.");
+    console.log("Use `pnpm db:reset` to truncate and reseed (development only).\n");
+    return;
+  }
 
   // ─── 1. Gym ─────────────────────────────────────────────────
   const [gym] = await db
@@ -256,7 +264,11 @@ async function seed() {
   console.log("\nSeed complete!");
 }
 
-seed().catch((err) => {
-  console.error("Seed failed:", err);
-  process.exit(1);
-});
+// Run directly when executed as a script (not when imported by reset.ts)
+const isDirectRun = process.argv[1]?.includes("seed") && !process.argv[1]?.includes("reset");
+if (isDirectRun) {
+  seed().catch((err) => {
+    console.error("Seed failed:", err);
+    process.exit(1);
+  });
+}

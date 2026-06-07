@@ -14,6 +14,11 @@ import * as controller from "./memberships.controller.js";
 export const membershipsRouter = Router();
 
 membershipsRouter.get(
+  "/",
+  controller.listAll
+);
+
+membershipsRouter.get(
   "/:id",
   validate(idParamSchema, "params"),
   controller.getById

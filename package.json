@@ -9,10 +9,13 @@
   },
   "scripts": {
     "dev:api": "pnpm --filter @gymflow/api dev",
+    "dev:web": "pnpm --filter @gymflow/web dev",
+    "build:web": "pnpm --filter @gymflow/web build",
     "build:api": "pnpm --filter @gymflow/api build",
     "db:generate": "pnpm --filter @gymflow/db generate",
     "db:migrate": "pnpm --filter @gymflow/db migrate",
     "db:seed": "pnpm --filter @gymflow/db seed",
+    "db:reset": "pnpm --filter @gymflow/db reset",
     "db:studio": "pnpm --filter @gymflow/db studio",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
