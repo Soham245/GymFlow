@@ -10,7 +10,6 @@ import {
   Bell,
   MessageSquare,
   UserPlus,
-  Dumbbell,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -75,9 +74,11 @@ export function Sidebar() {
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-            <Dumbbell className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="GymFlow"
+            className="h-8 w-8 rounded"
+          />
           <span className="text-lg font-semibold">GymFlow</span>
         </div>
 
