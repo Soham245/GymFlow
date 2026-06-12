@@ -8,7 +8,7 @@ export function AppLayout() {
   const [moreOpen, setMoreOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-background md:overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop/Tablet sidebar */}
       <Sidebar />
 

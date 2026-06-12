@@ -89,5 +89,18 @@
     *::-webkit-scrollbar {
       display: none;
     }
+
+    /* Prevent body-level scroll on mobile (100vh > visible viewport) */
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+  }
+
+  /* Let Recharts charts pass vertical scroll to parent */
+  .recharts-wrapper {
+    touch-action: pan-y;
   }
 }
