@@ -49,6 +49,7 @@ function useMeasured<T extends HTMLElement>() {
     const el = ref.current;
     if (!el) return;
     const ro = new ResizeObserver(([entry]) => {
+      if (!entry) return;
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) setSize({ w: Math.floor(width), h: Math.floor(height) });
     });
