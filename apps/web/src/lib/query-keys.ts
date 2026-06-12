@@ -35,6 +35,12 @@ export const queryKeys = {
     profit: (period: string) => ["reports", "profit", period] as const,
     memberships: ["reports", "memberships"] as const,
     outstanding: ["reports", "outstanding"] as const,
+    analytics: (key: string) => ["reports", "analytics", key] as const,
+  },
+  notifications: {
+    all: ["notifications"] as const,
+    list: (filters: object) => ["notifications", "list", filters] as const,
+    unreadCount: ["notifications", "unread-count"] as const,
   },
   plans: ["plans"] as const,
   automation: {

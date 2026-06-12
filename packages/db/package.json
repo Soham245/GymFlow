@@ -13,6 +13,7 @@
     "migrate": "tsx src/migrate.ts",
     "seed": "tsx src/seeds/seed.ts",
     "reset": "tsx src/seeds/reset.ts",
+    "demo": "tsx src/seeds/demo-seed.ts",
     "studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist *.tsbuildinfo"

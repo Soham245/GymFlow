@@ -24,6 +24,13 @@ expensesRouter.post(
   controller.create
 );
 
+// Batch delete MUST be above /:id routes to avoid "batch-delete" matching as a UUID param
+expensesRouter.post(
+  "/batch-delete",
+  authorize("owner"),
+  controller.batchDelete
+);
+
 expensesRouter.get(
   "/:id",
   validate(idParamSchema, "params"),

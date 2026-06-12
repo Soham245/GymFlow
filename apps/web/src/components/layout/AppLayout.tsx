@@ -3,27 +3,23 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BottomNav } from "./BottomNav";
 import { MoreSheet } from "./MoreSheet";
-import { QuickAddFAB } from "./QuickAddFAB";
 
 export function AppLayout() {
   const [moreOpen, setMoreOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background md:overflow-hidden">
       {/* Desktop/Tablet sidebar */}
       <Sidebar />
 
-      {/* Main content */}
-      <main className="flex-1 pb-16 md:pb-0">
+      {/* Main content — only this area scrolls on desktop */}
+      <main className="min-w-0 flex-1 overflow-y-auto pb-16 md:pb-0">
         <Outlet />
       </main>
 
       {/* Mobile bottom nav */}
       <BottomNav onMoreClick={() => setMoreOpen(true)} />
       <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
-
-      {/* Global Quick Add FAB (mobile) */}
-      <QuickAddFAB />
     </div>
   );
 }

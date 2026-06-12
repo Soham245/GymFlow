@@ -1,17 +1,10 @@
 import {
   eq,
   and,
-  or,
-  ilike,
-  gte,
-  lte,
-  asc,
   desc,
-  count,
   sql,
   inArray,
 } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
 import {
   members,
   memberNotes,
@@ -48,11 +41,6 @@ function memberToAuditRecord(m: Record<string, unknown>) {
   return rest;
 }
 
-const sortColumns = {
-  name: members.name,
-  joinDate: members.joinDate,
-  createdAt: members.createdAt,
-} as const;
 
 // ─── Create ─────────────────────────────────────────────────────
 
@@ -268,60 +256,120 @@ export async function listMembers(ctx: ServiceContext, query: ListMembersQuery) 
   const { db, gymId } = ctx;
   const { page, limit, status, search, joinDateFrom, joinDateTo, sortBy, sortOrder } = query;
 
-  const conditions: SQL[] = [eq(members.gymId, gymId)];
+  /*
+   * We use drizzle sql`` with a LATERAL join to pick each member's latest
+   * membership. Status is derived from that latest membership, not from
+   * the (possibly stale) members.status column.
+   */
 
-  if (status) {
-    conditions.push(eq(members.status, status));
-  }
+  // Build dynamic WHERE conditions using drizzle sql fragments
+  const whereParts: ReturnType<typeof sql>[] = [sql`m.gym_id = ${gymId}`];
 
   if (search) {
     const pattern = `%${search}%`;
-    conditions.push(
-      or(ilike(members.name, pattern), ilike(members.phone, pattern))!
-    );
+    whereParts.push(sql`(m.name ILIKE ${pattern} OR m.phone ILIKE ${pattern})`);
   }
-
   if (joinDateFrom) {
-    conditions.push(gte(members.joinDate, joinDateFrom));
+    whereParts.push(sql`m.join_date >= ${joinDateFrom}`);
   }
   if (joinDateTo) {
-    conditions.push(lte(members.joinDate, joinDateTo));
+    whereParts.push(sql`m.join_date <= ${joinDateTo}`);
+  }
+  if (status) {
+    whereParts.push(sql`COALESCE(lm.ms_status::text, m.status::text) = ${status}`);
   }
 
-  const where = and(...conditions)!;
-  const sortCol = sortColumns[sortBy];
-  const orderFn = sortOrder === "asc" ? asc : desc;
+  // Combine WHERE parts with AND
+  const whereClause = whereParts.reduce((acc, part, i) =>
+    i === 0 ? part : sql`${acc} AND ${part}`
+  );
+
+  // Sort mapping — use sql.raw for column names (safe: no user input)
+  const sortMap: Record<string, string> = {
+    name: "m.name",
+    joinDate: "m.join_date",
+    createdAt: "m.created_at",
+  };
+  const sortCol = sql.raw(sortMap[sortBy] ?? "m.created_at");
+  const orderDir = sql.raw(sortOrder === "asc" ? "ASC" : "DESC");
   const offset = (page - 1) * limit;
 
-  const [data, totalResult] = await Promise.all([
-    db
-      .select({
-        id: members.id,
-        name: members.name,
-        phone: members.phone,
-        email: members.email,
-        gender: members.gender,
-        joinDate: members.joinDate,
-        status: members.status,
-        photoUrl: members.photoUrl,
-        createdAt: members.createdAt,
-      })
-      .from(members)
-      .where(where)
-      .orderBy(orderFn(sortCol))
-      .limit(limit)
-      .offset(offset),
-    db
-      .select({ total: count() })
-      .from(members)
-      .where(where),
+  const [dataResult, countResult] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        m.id,
+        m.name,
+        m.phone,
+        m.email,
+        m.gender,
+        m.join_date   AS "joinDate",
+        m.photo_url   AS "photoUrl",
+        m.created_at  AS "createdAt",
+        COALESCE(lm.ms_status::text, m.status::text) AS status,
+        lm.ms_plan_name   AS "latestPlanName",
+        lm.ms_start_date  AS "latestStartDate",
+        lm.ms_end_date    AS "latestEndDate",
+        lm.ms_status      AS "latestMsStatus"
+      FROM members m
+      LEFT JOIN LATERAL (
+        SELECT
+          mm.status     AS ms_status,
+          mm.start_date AS ms_start_date,
+          mm.end_date   AS ms_end_date,
+          mp.name       AS ms_plan_name
+        FROM member_memberships mm
+        JOIN membership_plans mp ON mp.id = mm.plan_id
+        WHERE mm.member_id = m.id
+        ORDER BY mm.end_date DESC, mm.created_at DESC
+        LIMIT 1
+      ) lm ON true
+      WHERE ${whereClause}
+      ORDER BY ${sortCol} ${orderDir}
+      LIMIT ${limit} OFFSET ${offset}
+    `),
+    db.execute(sql`
+      SELECT COUNT(*)::int AS total
+      FROM members m
+      LEFT JOIN LATERAL (
+        SELECT mm.status AS ms_status
+        FROM member_memberships mm
+        WHERE mm.member_id = m.id
+        ORDER BY mm.end_date DESC, mm.created_at DESC
+        LIMIT 1
+      ) lm ON true
+      WHERE ${whereClause}
+    `),
   ]);
 
-  const total = totalResult[0]!.total;
+  // neon-http returns array directly; some drizzle versions wrap in { rows }
+  const data = ((dataResult as any).rows ?? dataResult) as any[];
+  const totalRows = ((countResult as any).rows ?? countResult) as any[];
+  const total: number = totalRows[0]?.total ?? 0;
   const totalPages = Math.ceil(total / limit);
 
+  // Shape items to include latestMembership nested object
+  const items = data.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    gender: row.gender,
+    joinDate: row.joinDate,
+    status: row.status,
+    photoUrl: row.photoUrl,
+    createdAt: row.createdAt,
+    latestMembership: row.latestPlanName
+      ? {
+          planName: row.latestPlanName,
+          startDate: row.latestStartDate,
+          endDate: row.latestEndDate,
+          status: row.latestMsStatus,
+        }
+      : null,
+  }));
+
   return {
-    items: data,
+    items,
     total,
     page,
     totalPages,

@@ -70,6 +70,15 @@ export default function ExpenseDetailPage() {
             Edit
           </Button>
         }
+        mobileActions={
+          <button
+            onClick={() => navigate(ROUTES.EXPENSE_EDIT(id!))}
+            className="rounded-md p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Edit expense"
+          >
+            <Pencil className="h-5 w-5" />
+          </button>
+        }
       />
 
       <div className="p-4 md:p-6">

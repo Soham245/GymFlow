@@ -51,6 +51,18 @@ export function resolveDateRange(
       };
     }
 
+    case "last_30_days": {
+      const d30 = new Date(now);
+      d30.setDate(d30.getDate() - 29);
+      return { from: `${d30.getFullYear()}-${pad(d30.getMonth() + 1)}-${pad(d30.getDate())}`, to: today };
+    }
+
+    case "last_90_days": {
+      const d90 = new Date(now);
+      d90.setDate(d90.getDate() - 89);
+      return { from: `${d90.getFullYear()}-${pad(d90.getMonth() + 1)}-${pad(d90.getDate())}`, to: today };
+    }
+
     case "this_year":
       return { from: `${year}-01-01`, to: today };
 
@@ -67,4 +79,19 @@ export function resolveDateRange(
       return { from: customFrom, to: customTo };
     }
   }
+}
+
+export function previousDateRange(range: DateRange): DateRange {
+  const from = new Date(range.from + "T00:00:00");
+  const to = new Date(range.to + "T00:00:00");
+  const spanMs = to.getTime() - from.getTime();
+  const spanDays = Math.round(spanMs / (1000 * 60 * 60 * 24));
+
+  const prevTo = new Date(from);
+  prevTo.setDate(prevTo.getDate() - 1);
+  const prevFrom = new Date(prevTo);
+  prevFrom.setDate(prevFrom.getDate() - spanDays);
+
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return { from: fmt(prevFrom), to: fmt(prevTo) };
 }

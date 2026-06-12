@@ -36,25 +36,44 @@ export function StatCard({
   return (
     <Wrapper
       className={cn(
-        "flex items-start gap-3 rounded-lg border bg-card p-4 text-left shadow-sm",
-        onClick && "cursor-pointer transition-colors hover:bg-accent/50 active:bg-accent",
+        "relative rounded-lg border bg-card p-3 text-left shadow-sm md:p-4",
+        onClick &&
+          "cursor-pointer transition-colors hover:bg-accent/50 active:bg-accent",
         className
       )}
       onClick={onClick}
     >
-      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", iconBg)}>
-        <Icon className={cn("h-5 w-5", iconColor)} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="mt-0.5 text-xl font-bold leading-tight tracking-tight">{value}</p>
-        {subtitle && (
-          <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
+      {/* Icon — top-right accent */}
+      <div
+        className={cn(
+          "absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md md:right-4 md:top-4",
+          iconBg
         )}
+      >
+        <Icon className={cn("h-4 w-4", iconColor)} />
+      </div>
+
+      {/* Text stack — full width, left-aligned */}
+      <div className="pr-10">
+        <p className="text-xs font-medium leading-none text-muted-foreground">
+          {label}
+        </p>
+        <p className="mt-2 text-lg font-bold leading-tight tracking-tight md:text-xl">
+          {value}
+        </p>
+        {/* Always render subtitle row for consistent card height */}
+        <p
+          className={cn(
+            "mt-1 text-[11px]",
+            subtitle ? "text-muted-foreground" : "invisible"
+          )}
+        >
+          {subtitle || " "}
+        </p>
         {trend && (
           <p
             className={cn(
-              "mt-0.5 text-xs font-medium",
+              "mt-1 text-[11px] font-medium",
               trendDirection === "up" && "text-green-600",
               trendDirection === "down" && "text-red-600",
               trendDirection === "neutral" && "text-muted-foreground"

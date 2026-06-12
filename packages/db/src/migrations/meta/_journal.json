@@ -22,6 +22,41 @@
       "when": 1780859344103,
       "tag": "0002_cultured_gamora",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781083029979,
+      "tag": "0003_lively_odin",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781100932435,
+      "tag": "0004_first_sage",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781103033715,
+      "tag": "0005_orange_marrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781105221114,
+      "tag": "0006_closed_iron_patriot",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781270400000,
+      "tag": "0007_add_daily_summary_notification",
+      "breakpoints": true
     }
   ]
 }

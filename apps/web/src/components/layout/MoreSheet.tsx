@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import {
   CreditCard,
-  Receipt,
+  BarChart3,
   Settings,
   Bell,
   MessageSquare,
@@ -26,7 +26,7 @@ interface NavItem {
 
 const items: NavItem[] = [
   { icon: CreditCard, label: "Memberships", route: ROUTES.MEMBERSHIPS },
-  { icon: Receipt, label: "Expenses", route: ROUTES.EXPENSES },
+  { icon: BarChart3, label: "Reports", route: ROUTES.REPORTS },
   { icon: Settings, label: "Settings", route: ROUTES.SETTINGS },
   { icon: Bell, label: "Notifications", route: ROUTES.NOTIFICATIONS, soon: true },
   { icon: MessageSquare, label: "Messages", route: ROUTES.MESSAGES, soon: true },

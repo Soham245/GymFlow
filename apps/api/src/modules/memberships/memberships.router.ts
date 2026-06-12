@@ -18,6 +18,13 @@ membershipsRouter.get(
   controller.listAll
 );
 
+// Batch delete MUST be above /:id routes
+membershipsRouter.post(
+  "/batch-delete",
+  authorize("owner"),
+  controller.batchDelete
+);
+
 membershipsRouter.get(
   "/:id",
   validate(idParamSchema, "params"),

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "in_app_notif_gym_type_entity_uniq" ON "in_app_notifications" USING btree ("gym_id","type","related_entity_type","related_entity_id");

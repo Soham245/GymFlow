@@ -40,7 +40,7 @@ export function ActionCard({
   return (
     <button
       className={cn(
-        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+        "flex w-full items-center gap-2.5 md:gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
         "hover:bg-accent/50 active:bg-accent",
         className
       )}
@@ -60,17 +60,17 @@ export function ActionCard({
       {trailing ?? (
         <>
           {(value || valueSubtitle) && (
-            <div className="shrink-0 text-right">
-              {value && <p className="text-sm font-semibold tabular-nums">{value}</p>}
+            <div className="text-right">
+              {value && <p className="text-[13px] md:text-sm font-semibold tabular-nums whitespace-nowrap">{value}</p>}
               {valueSubtitle && (
-                <p className="text-xs text-muted-foreground">{valueSubtitle}</p>
+                <p className="text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">{valueSubtitle}</p>
               )}
             </div>
           )}
         </>
       )}
       {showChevron && (
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <ChevronRight className="hidden md:block h-4 w-4 shrink-0 text-muted-foreground" />
       )}
     </button>
   );

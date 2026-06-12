@@ -1,0 +1,2 @@
+ALTER TYPE "public"."audit_action" ADD VALUE 'membership_auto_expired' BEFORE 'payment_created';--> statement-breakpoint
+ALTER TYPE "public"."audit_action" ADD VALUE 'membership_auto_unfrozen' BEFORE 'payment_created';

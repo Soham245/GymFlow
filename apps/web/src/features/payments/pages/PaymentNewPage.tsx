@@ -75,10 +75,10 @@ export default function PaymentNewPage() {
   const memberships = useQuery({
     queryKey: queryKeys.memberships.member(selectedMemberId),
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Membership[]>>(
+      const res = await api.get<ApiResponse<{ memberships: Membership[] }>>(
         MEMBERSHIPS.MEMBER_LIST(selectedMemberId)
       );
-      return res.data.data;
+      return res.data.data.memberships;
     },
     staleTime: 60_000,
     enabled: !!selectedMemberId,

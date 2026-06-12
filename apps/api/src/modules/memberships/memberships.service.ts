@@ -1,9 +1,10 @@
-import { eq, and, desc, or, ilike, sql, gte, lte, count as countFn, asc } from "drizzle-orm";
+import { eq, and, desc, or, ilike, sql, gte, lte, count as countFn, asc, inArray } from "drizzle-orm";
 import {
   memberMemberships,
   membershipPlans,
   membershipFreezes,
   members,
+  payments,
 } from "@gymflow/db";
 import type { Database } from "@gymflow/db";
 import type {
@@ -581,4 +582,58 @@ export async function unfreezeMembership(
     daysAdded: daysToAdd,
     freezeId: activeFreeze.id,
   };
+}
+
+// ─── Batch Delete Memberships ──────────────────────────────────
+
+export async function batchDeleteMemberships(ctx: Ctx, membershipIds: string[]) {
+  const { db, gymId, userId } = ctx;
+
+  if (membershipIds.length === 0) return { deleted: 0 };
+  if (membershipIds.length > 50) {
+    throw AppError.badRequest("Cannot delete more than 50 memberships at once");
+  }
+
+  const existing = await db
+    .select({
+      id: memberMemberships.id,
+      memberId: memberMemberships.memberId,
+      status: memberMemberships.status,
+    })
+    .from(memberMemberships)
+    .innerJoin(members, eq(members.id, memberMemberships.memberId))
+    .where(and(eq(members.gymId, gymId), inArray(memberMemberships.id, membershipIds)));
+
+  if (existing.length !== membershipIds.length) {
+    throw AppError.badRequest("Some membership IDs are invalid or don't belong to this gym");
+  }
+
+  // Delete in FK-safe order: freezes → payments → memberships
+  await db
+    .delete(membershipFreezes)
+    .where(inArray(membershipFreezes.membershipId, membershipIds));
+
+  await db
+    .delete(payments)
+    .where(inArray(payments.membershipId, membershipIds));
+
+  await db
+    .delete(memberMemberships)
+    .where(inArray(memberMemberships.id, membershipIds));
+
+  for (const ms of existing) {
+    await createAuditLog(db, {
+      gymId,
+      userId,
+      action: "membership_cancelled",
+      entityType: "membership",
+      entityId: ms.id,
+      oldValues: { status: ms.status, memberId: ms.memberId },
+      newValues: null,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+    });
+  }
+
+  return { deleted: existing.length };
 }

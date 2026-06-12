@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { REPORTS } from "@/api/endpoints";
 import { queryKeys } from "@/lib/query-keys";
-import type { ApiResponse, OutstandingBalancesData } from "@/api/types";
+import type { ApiResponse, OutstandingBalancesData, AnalyticsData } from "@/api/types";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -11,6 +11,8 @@ export type ReportPeriod =
   | "this_week"
   | "this_month"
   | "last_month"
+  | "last_30_days"
+  | "last_90_days"
   | "this_year"
   | "all_time"
   | "custom";
@@ -141,5 +143,32 @@ export function useOutstandingBalances() {
       return res.data.data;
     },
     staleTime: 2 * 60_000,
+  });
+}
+
+// ─── Unified Analytics ───────────────────────────────────────
+
+export type AnalyticsQuery = {
+  range: ReportPeriod;
+  from?: string;
+  to?: string;
+};
+
+export function useAnalytics(query: AnalyticsQuery) {
+  const params = new URLSearchParams();
+  params.set("range", query.range);
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
+  const key = `${query.range}-${query.from ?? ""}-${query.to ?? ""}`;
+
+  return useQuery({
+    queryKey: queryKeys.reports.analytics(key),
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<AnalyticsData>>(
+        `${REPORTS.ANALYTICS}?${params.toString()}`
+      );
+      return res.data.data;
+    },
+    staleTime: 60_000,
   });
 }

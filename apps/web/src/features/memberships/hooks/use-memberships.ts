@@ -83,6 +83,27 @@ export function usePlans() {
   });
 }
 
+// ─── Batch Delete Memberships ──────────────────────────────────
+
+export function useBatchDeleteMemberships() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await api.post<ApiResponse<{ deleted: number }>>(
+        MEMBERSHIPS.BATCH_DELETE,
+        { ids }
+      );
+      return res.data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.memberships.all });
+      qc.invalidateQueries({ queryKey: queryKeys.members.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.reports.outstanding });
+    },
+  });
+}
+
 // ─── Renew Membership ──────────────────────────────────────────
 
 interface RenewInput {

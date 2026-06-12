@@ -5,7 +5,7 @@ type AuditAction = typeof auditLogs.$inferInsert.action;
 
 interface AuditEntry {
   gymId: string;
-  userId: string;
+  userId?: string;
   action: AuditAction;
   entityType: string;
   entityId: string;

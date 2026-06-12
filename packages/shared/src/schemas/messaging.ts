@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MESSAGE_TRIGGER_TYPES, NOTIFICATION_CHANNELS, SCHEDULED_MESSAGE_STATUSES } from "../constants/enums.js";
+import { MESSAGE_TRIGGER_TYPES, NOTIFICATION_CHANNELS } from "../constants/enums.js";
 import { uuidSchema, paginationSchema, dateStringSchema } from "./common.js";
 
 // ─── Message Templates ─────────────────────────────────────────

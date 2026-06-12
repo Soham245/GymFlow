@@ -37,6 +37,7 @@ export const PLANS = {
 
 export const MEMBERSHIPS = {
   LIST: "/memberships",
+  BATCH_DELETE: "/memberships/batch-delete",
   MEMBER_LIST: (memberId: string) => `/members/${memberId}/memberships`,
   CREATE: (memberId: string) => `/members/${memberId}/memberships`,
   DETAIL: (id: string) => `/memberships/${id}`,
@@ -71,6 +72,7 @@ export const EXPENSE_CATEGORIES = {
 export const EXPENSES = {
   LIST: "/expenses",
   CREATE: "/expenses",
+  BATCH_DELETE: "/expenses/batch-delete",
   DETAIL: (id: string) => `/expenses/${id}`,
   UPDATE: (id: string) => `/expenses/${id}`,
 } as const;
@@ -89,6 +91,18 @@ export const REPORTS = {
   PROFIT: "/reports/profit",
   MEMBERSHIPS: "/reports/memberships",
   OUTSTANDING: "/reports/outstanding-balances",
+  ANALYTICS: "/reports/analytics",
+} as const;
+
+// ─── Notifications ────────────────────────────────────────────
+
+export const NOTIFICATIONS = {
+  LIST: "/notifications",
+  UNREAD_COUNT: "/notifications/unread-count",
+  READ_ALL: "/notifications/read-all",
+  MARK_READ: (id: string) => `/notifications/${id}/read`,
+  DELETE: (id: string) => `/notifications/${id}`,
+  RUN_AUTOMATION: "/notifications/run-automation",
 } as const;
 
 // ─── Automation ────────────────────────────────────────────────
@@ -97,6 +111,7 @@ export const AUTOMATION = {
   EXPIRING: "/automation/expiring-memberships",
   EXPIRED: "/automation/expired-memberships",
   DAILY_SUMMARY: "/automation/daily-summary",
+  GENERATE_SUMMARY: "/automation/generate-daily-summary",
   BACKUP_STATUS: "/automation/backup-status",
 } as const;
 

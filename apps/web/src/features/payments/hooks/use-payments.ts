@@ -20,6 +20,8 @@ export interface PaymentsFilter {
   dateFrom?: string;
   dateTo?: string;
   receiptNumber?: string;
+  sortBy?: string;
+  sortOrder?: string;
 }
 
 interface PaymentsListResponse {
@@ -39,6 +41,8 @@ export function usePayments(filters: PaymentsFilter = {}) {
       if (filters.dateFrom) params.set("dateFrom", filters.dateFrom);
       if (filters.dateTo) params.set("dateTo", filters.dateTo);
       if (filters.receiptNumber) params.set("receiptNumber", filters.receiptNumber);
+      if (filters.sortBy) params.set("sortBy", filters.sortBy);
+      if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
 
       const res = await api.get<ApiResponse<PaymentsListResponse> & { meta?: PaginationMeta }>(
         `${PAYMENTS.LIST}?${params.toString()}`

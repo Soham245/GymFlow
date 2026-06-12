@@ -114,6 +114,25 @@ export function useUpdateExpense(expenseId: string) {
   });
 }
 
+// ─── Batch Delete Expenses ────────────────────────────────────
+
+export function useBatchDeleteExpenses() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await api.post<ApiResponse<{ deleted: number }>>(
+        EXPENSES.BATCH_DELETE,
+        { ids }
+      );
+      return res.data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+    },
+  });
+}
+
 // ─── Expense Categories ───────────────────────────────────────
 
 export function useExpenseCategories(includeInactive = false) {

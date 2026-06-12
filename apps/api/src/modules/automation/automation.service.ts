@@ -116,77 +116,85 @@ export async function getExpiredMemberships(ctx: Ctx) {
 
 // ─── Daily Business Summary ─────────────────────────────────────
 
-export async function getDailySummary(ctx: Ctx) {
+export async function getDailySummary(ctx: Ctx, options?: { from?: string; to?: string }) {
   const { db, gymId } = ctx;
-  const today = todayStr();
-  const in7 = futureStr(7);
+  const from = options?.from ?? todayStr();
+  const to = options?.to ?? from;
+  const isRange = from !== to;
 
   const [
-    todayRevResult,
-    todayExpResult,
+    revResult,
+    expResult,
     newMembersResult,
-    expiringResult,
-    recentPayments,
+    renewalsResult,
   ] = await Promise.all([
     db
       .select({ total: sum(payments.amount), cnt: count() })
       .from(payments)
-      .where(and(eq(payments.gymId, gymId), eq(payments.paymentDate, today))),
-
-    db
-      .select({ total: sum(expenses.amount), cnt: count() })
-      .from(expenses)
-      .where(and(eq(expenses.gymId, gymId), eq(expenses.expenseDate, today))),
-
-    db
-      .select({ cnt: count() })
-      .from(members)
-      .where(and(eq(members.gymId, gymId), eq(members.joinDate, today))),
-
-    db
-      .select({ cnt: count() })
-      .from(memberMemberships)
       .where(
         and(
-          eq(memberMemberships.gymId, gymId),
-          eq(memberMemberships.status, "active"),
-          gte(memberMemberships.endDate, today),
-          lte(memberMemberships.endDate, in7)
+          eq(payments.gymId, gymId),
+          gte(payments.paymentDate, from),
+          lte(payments.paymentDate, to)
         )
       ),
 
     db
-      .select({
-        memberName: members.name,
-        amount: payments.amount,
-        method: payments.paymentMethod,
-        receiptNumber: payments.receiptNumber,
-      })
-      .from(payments)
-      .innerJoin(members, eq(payments.memberId, members.id))
-      .where(and(eq(payments.gymId, gymId), eq(payments.paymentDate, today)))
-      .orderBy(desc(payments.createdAt))
-      .limit(10),
+      .select({ total: sum(expenses.amount), cnt: count() })
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.gymId, gymId),
+          gte(expenses.expenseDate, from),
+          lte(expenses.expenseDate, to)
+        )
+      ),
+
+    db
+      .select({ cnt: count() })
+      .from(members)
+      .where(
+        and(
+          eq(members.gymId, gymId),
+          gte(members.joinDate, from),
+          lte(members.joinDate, to)
+        )
+      ),
+
+    // Renewals: memberships created in the date range for existing members (joinDate < from)
+    db
+      .select({ cnt: count() })
+      .from(memberMemberships)
+      .innerJoin(members, eq(memberMemberships.memberId, members.id))
+      .where(
+        and(
+          eq(memberMemberships.gymId, gymId),
+          sql`${memberMemberships.createdAt}::date >= ${from}::date`,
+          sql`${memberMemberships.createdAt}::date <= ${to}::date`,
+          sql`${members.joinDate}::date < ${from}::date`
+        )
+      ),
   ]);
 
-  const todayRevenue = Number(todayRevResult[0]?.total ?? 0);
-  const todayExpenses = Number(todayExpResult[0]?.total ?? 0);
+  const revenue = Number(revResult[0]?.total ?? 0);
+  const expenseTotal = Number(expResult[0]?.total ?? 0);
 
   return {
     generatedAt: new Date().toISOString(),
-    date: today,
+    from,
+    to,
+    isRange,
     revenue: {
-      total: toMoney(todayRevenue),
-      paymentCount: todayRevResult[0]?.cnt ?? 0,
+      total: toMoney(revenue),
+      paymentCount: revResult[0]?.cnt ?? 0,
     },
     expenses: {
-      total: toMoney(todayExpenses),
-      expenseCount: todayExpResult[0]?.cnt ?? 0,
+      total: toMoney(expenseTotal),
+      expenseCount: expResult[0]?.cnt ?? 0,
     },
-    profit: toMoney(todayRevenue - todayExpenses),
-    newMembersToday: newMembersResult[0]?.cnt ?? 0,
-    membershipsExpiring7Days: expiringResult[0]?.cnt ?? 0,
-    recentPayments,
+    profit: toMoney(revenue - expenseTotal),
+    newMembers: newMembersResult[0]?.cnt ?? 0,
+    renewals: renewalsResult[0]?.cnt ?? 0,
   };
 }
 

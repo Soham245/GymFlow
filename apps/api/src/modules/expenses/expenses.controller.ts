@@ -29,6 +29,12 @@ export const update = asyncHandler(async (req, res) => {
   sendSuccess(res, { expense });
 });
 
+export const batchDelete = asyncHandler(async (req: Request, res: Response) => {
+  const { ids } = req.body;
+  const result = await svc.batchDeleteExpenses(ctx(req), ids);
+  sendSuccess(res, result);
+});
+
 export const list = asyncHandler(async (req: Request & { validatedQuery?: unknown }, res: Response) => {
   const result = await svc.listExpenses(ctx(req), (req.validatedQuery ?? req.query) as any);
   sendSuccess(res, { expenses: result.items }, {

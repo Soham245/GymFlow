@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IndianRupee,
@@ -8,63 +8,46 @@ import {
   CreditCard,
   Receipt,
   UserPlus,
-  Plus,
   Users,
   Clock,
   CalendarClock,
   Wallet,
+  RefreshCw,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useRole } from "@/hooks/use-permission";
 import {
   useDashboard,
+  useActivitySummary,
+  useActivitySummaryPrev,
   useExpiringMemberships,
   useOutstandingBalances,
 } from "../hooks/use-dashboard";
-import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { ActionCard } from "@/components/shared/ActionCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
-import { QuickActionButton } from "@/components/shared/QuickActionButton";
 import { DashboardSkeleton } from "@/components/shared/LoadingSkeleton";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { PullToRefreshIndicator } from "@/components/shared/PullToRefreshIndicator";
 import { ROUTES } from "@/lib/constants";
-import { formatMoney, formatDate, formatRelativeDate } from "@/lib/utils";
-import { usePermission } from "@/hooks/use-permission";
+import { formatMoney, formatCompactMoney, formatDate, formatRelativeDate } from "@/lib/utils";
+import { FloatingActionMenu } from "@/components/shared/FloatingActionMenu";
 import type { ExpiringMember } from "@/api/types";
 
 // ─── Main Dashboard Page ───────────────────────────────────────
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const role = useRole();
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
   const dashboard = useDashboard();
   const expiring = useExpiringMemberships();
   const outstanding = useOutstandingBalances();
 
-  const canCreateMembers = usePermission("members:create");
-  const canCreatePayments = usePermission("payments:create");
-  const canCreateExpenses = usePermission("expenses:create");
-  const canCreateMemberships = usePermission("memberships:create");
-
-  // Pull-to-refresh: refetch all dashboard queries
-  const handleRefresh = useCallback(async () => {
-    await Promise.all([
-      dashboard.refetch(),
-      expiring.refetch(),
-      outstanding.refetch(),
-    ]);
-  }, [dashboard, expiring, outstanding]);
-
-  const { containerRef, isRefreshing, pullDistance } = usePullToRefresh({
-    onRefresh: handleRefresh,
-    enabled: isMobile,
-  });
 
   // ─── Loading ────────────────────────────────────────────────
   if (dashboard.isLoading) {
@@ -96,63 +79,29 @@ export default function DashboardPage() {
     <>
       <PageHeader title={`Hi, ${user?.name.split(" ")[0] ?? "there"}`} subtitle={todayLabel()} />
 
-      <div ref={containerRef} className="overflow-y-auto">
-        {/* Pull-to-refresh indicator */}
-        <PullToRefreshIndicator
-          pullDistance={pullDistance}
-          isRefreshing={isRefreshing}
-        />
-
-        <div className="space-y-5 p-4 md:p-6">
+      <div className="space-y-5 p-4 pb-24 md:p-6 md:pb-6">
           {/* ─── Last Updated ───────────────────────────────── */}
           <LastUpdated
             dataUpdatedAt={dashboard.dataUpdatedAt}
             isFetching={dashboard.isFetching}
           />
 
-          {/* ─── Section A: KPI Cards ──────────────────────── */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <StatCard
-              label="Today's Revenue"
-              value={formatMoney(data.revenue.today)}
-              icon={TrendingUp}
-              iconBg="bg-green-100"
-              iconColor="text-green-700"
-              subtitle={`Month: ${formatMoney(data.revenue.month)}`}
+          {/* ─── Section A: Activity Summary ─────────────────── */}
+          {role === "owner" && (
+            <ActivitySummarySection
+              outstandingBalance={data.outstandingBalance}
+              onOutstandingClick={() => navigate(ROUTES.REPORT_OUTSTANDING)}
             />
-            <StatCard
-              label="Today's Expenses"
-              value={formatMoney(data.expenses.today)}
-              icon={TrendingDown}
-              iconBg="bg-red-100"
-              iconColor="text-red-700"
-              subtitle={`Month: ${formatMoney(data.expenses.month)}`}
-            />
-            <StatCard
-              label="Today's Profit"
-              value={formatMoney(data.profit.today)}
-              icon={IndianRupee}
-              iconBg="bg-blue-100"
-              iconColor="text-blue-700"
-              subtitle={`Month: ${formatMoney(data.profit.month)}`}
-            />
-            <StatCard
-              label="Outstanding"
-              value={formatMoney(data.outstandingBalance)}
-              icon={AlertCircle}
-              iconBg="bg-orange-100"
-              iconColor="text-orange-700"
-              onClick={() => navigate(ROUTES.REPORT_OUTSTANDING)}
-            />
-          </div>
+          )}
 
-          {/* ─── Section B: Attention Required ──────────────── */}
+          {/* ─── Section C: Attention Required ──────────────── */}
           <AttentionSection
             expiring={expiring.data}
             isLoading={expiring.isLoading}
             isError={expiring.isError}
             onRetry={() => expiring.refetch()}
             onMemberClick={(memberId) => navigate(ROUTES.MEMBER_DETAIL(memberId))}
+            onRenew={(membershipId) => navigate(ROUTES.MEMBERSHIP_DETAIL(membershipId))}
           />
 
           {/* ─── Section C: Outstanding Balances ─────────────── */}
@@ -162,15 +111,17 @@ export default function DashboardPage() {
             isError={outstanding.isError}
             onRetry={() => outstanding.refetch()}
             onMemberClick={(memberId) => navigate(ROUTES.MEMBER_DETAIL(memberId))}
-            onPayment={() => navigate(ROUTES.PAYMENT_NEW)}
+            onPayment={(memberId, membershipId) => navigate(`${ROUTES.PAYMENT_NEW}?memberId=${memberId}&membershipId=${membershipId}`)}
             onViewAll={() => navigate(ROUTES.REPORT_OUTSTANDING)}
           />
 
           {/* ─── Section D: Recent Activity ──────────────────── */}
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2 [&>*]:min-w-0">
             <SectionCard
               title="Recent Payments"
+              count={data.recentPayments.length > 5 ? data.recentPayments.length : undefined}
               onViewAll={() => navigate(ROUTES.PAYMENTS)}
+              viewAllLabel={data.recentPayments.length > 5 ? `View All (${data.recentPayments.length})` : "View All"}
             >
               {data.recentPayments.length === 0 ? (
                 <EmptyState
@@ -180,7 +131,7 @@ export default function DashboardPage() {
                 />
               ) : (
                 <div className="-mx-3 divide-y">
-                  {data.recentPayments.map((p) => (
+                  {data.recentPayments.slice(0, 5).map((p) => (
                     <ActionCard
                       key={p.id}
                       title={p.memberName}
@@ -199,7 +150,9 @@ export default function DashboardPage() {
 
             <SectionCard
               title="Recent Expenses"
+              count={data.recentExpenses.length > 5 ? data.recentExpenses.length : undefined}
               onViewAll={() => navigate(ROUTES.EXPENSES)}
+              viewAllLabel={data.recentExpenses.length > 5 ? `View All (${data.recentExpenses.length})` : "View All"}
             >
               {data.recentExpenses.length === 0 ? (
                 <EmptyState
@@ -209,7 +162,7 @@ export default function DashboardPage() {
                 />
               ) : (
                 <div className="-mx-3 divide-y">
-                  {data.recentExpenses.map((e) => (
+                  {data.recentExpenses.slice(0, 5).map((e) => (
                     <ActionCard
                       key={e.id}
                       title={e.categoryName}
@@ -227,50 +180,6 @@ export default function DashboardPage() {
             </SectionCard>
           </div>
 
-          {/* ─── Section E: Quick Actions ────────────────────── */}
-          {(canCreateMembers || canCreatePayments || canCreateExpenses || canCreateMemberships) && (
-            <SectionCard title="Quick Actions">
-              <div className="grid grid-cols-4 gap-2">
-                {canCreateMembers && (
-                  <QuickActionButton
-                    label="Add Member"
-                    icon={UserPlus}
-                    iconBg="bg-blue-100"
-                    iconColor="text-blue-700"
-                    onClick={() => navigate(ROUTES.MEMBER_NEW)}
-                  />
-                )}
-                {canCreatePayments && (
-                  <QuickActionButton
-                    label="Payment"
-                    icon={CreditCard}
-                    iconBg="bg-green-100"
-                    iconColor="text-green-700"
-                    onClick={() => navigate(ROUTES.PAYMENT_NEW)}
-                  />
-                )}
-                {canCreateExpenses && (
-                  <QuickActionButton
-                    label="Expense"
-                    icon={Wallet}
-                    iconBg="bg-orange-100"
-                    iconColor="text-orange-700"
-                    onClick={() => navigate(ROUTES.EXPENSE_NEW)}
-                  />
-                )}
-                {canCreateMemberships && (
-                  <QuickActionButton
-                    label="Membership"
-                    icon={Plus}
-                    iconBg="bg-purple-100"
-                    iconColor="text-purple-700"
-                    onClick={() => navigate(ROUTES.MEMBERS)}
-                  />
-                )}
-              </div>
-            </SectionCard>
-          )}
-
           {/* ─── Member Overview (compact) ───────────────────── */}
           <SectionCard
             title="Members"
@@ -284,8 +193,193 @@ export default function DashboardPage() {
             </div>
           </SectionCard>
         </div>
-      </div>
+
+      <FloatingActionMenu />
     </>
+  );
+}
+
+// ─── Activity Summary Section ──────────────────────────────────
+
+type ActivityRange = "today" | "last7days" | "last30days";
+const ACTIVITY_RANGE_LABELS: Record<ActivityRange, string> = {
+  today: "Today",
+  last7days: "Last 7 Days",
+  last30days: "Last 30 Days",
+};
+
+interface ActivitySummarySectionProps {
+  outstandingBalance: string;
+  prevOutstandingBalance?: string;
+  onOutstandingClick: () => void;
+}
+
+const PREV_LABEL: Record<ActivityRange, string> = {
+  today: "vs Yesterday",
+  last7days: "vs Prev 7 Days",
+  last30days: "vs Prev 30 Days",
+};
+
+function parseMoney(s: string): number {
+  return Number(s.replace(/[^0-9.-]/g, "")) || 0;
+}
+
+function calcChange(current: number, previous: number): { pct: string; dir: "up" | "down" | "flat" } {
+  if (previous === 0 && current === 0) return { pct: "0", dir: "flat" };
+  if (previous === 0) return { pct: "∞", dir: "up" };
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  return {
+    pct: Math.abs(pct).toFixed(1) + "%",
+    dir: pct > 0 ? "up" : pct < 0 ? "down" : "flat",
+  };
+}
+
+function calcDelta(current: number, previous: number): { delta: string; dir: "up" | "down" | "flat" } {
+  const diff = current - previous;
+  return {
+    delta: String(Math.abs(diff)),
+    dir: diff > 0 ? "up" : diff < 0 ? "down" : "flat",
+  };
+}
+
+function ActivitySummarySection({ outstandingBalance, onOutstandingClick }: ActivitySummarySectionProps) {
+  const [range, setRange] = useState<ActivityRange>("today");
+  const summary = useActivitySummary(range);
+  const prev = useActivitySummaryPrev(range);
+
+  const d = summary.data;
+  const p = prev.data;
+
+  const revChange = d && p ? calcChange(parseMoney(d.revenue.total), parseMoney(p.revenue.total)) : null;
+  const expChange = d && p ? calcChange(parseMoney(d.expenses.total), parseMoney(p.expenses.total)) : null;
+  const profitChange = d && p ? calcChange(parseMoney(d.profit), parseMoney(p.profit)) : null;
+  const membersChange = d && p ? calcDelta(d.newMembers, p.newMembers) : null;
+  const renewalsChange = d && p ? calcDelta(d.renewals, p.renewals) : null;
+  const paymentsChange = d && p ? calcDelta(d.revenue.paymentCount, p.revenue.paymentCount) : null;
+  const expCountChange = d && p ? calcDelta(d.expenses.expenseCount, p.expenses.expenseCount) : null;
+
+  const prevLabel = PREV_LABEL[range];
+
+  return (
+    <SectionCard
+      title="Activity Summary"
+      actions={
+        <div className="grid min-w-[16rem] max-w-sm flex-1 grid-cols-3 rounded-lg border border-border/60 bg-muted/40 p-0.5 ml-auto">
+          {(Object.keys(ACTIVITY_RANGE_LABELS) as ActivityRange[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold text-center whitespace-nowrap transition-colors ${
+                range === r
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {ACTIVITY_RANGE_LABELS[r]}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      {summary.isLoading ? (
+        <div className="space-y-3 md:space-y-4">
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-[108px] md:h-[128px] animate-pulse rounded-xl md:rounded-2xl bg-muted" />
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+            {[5, 6, 7, 8].map((i) => (
+              <div key={i} className="h-[108px] md:h-[128px] animate-pulse rounded-xl md:rounded-2xl bg-muted" />
+            ))}
+          </div>
+        </div>
+      ) : summary.isError ? (
+        <ErrorState title="Couldn't load activity" onRetry={() => summary.refetch()} />
+      ) : d ? (
+        <div className="space-y-3 md:space-y-4">
+          {/* Financial row */}
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+            <MetricCard label="Revenue" value={formatMoney(d.revenue.total)} compactValue={formatCompactMoney(d.revenue.total)} icon={TrendingUp} color="text-green-700" bg="bg-green-50/80" comparison={revChange} prevLabel={prevLabel} />
+            <MetricCard label="Expenses" value={formatMoney(d.expenses.total)} compactValue={formatCompactMoney(d.expenses.total)} icon={TrendingDown} color="text-red-600" bg="bg-red-50/80" comparison={expChange} prevLabel={prevLabel} invertTrend />
+            <MetricCard label="Profit" value={formatMoney(d.profit)} compactValue={formatCompactMoney(d.profit)} icon={IndianRupee} color="text-blue-700" bg="bg-blue-50/80" comparison={profitChange} prevLabel={prevLabel} />
+            <MetricCard label="Outstanding" value={formatMoney(outstandingBalance)} compactValue={formatCompactMoney(outstandingBalance)} icon={AlertCircle} color="text-orange-600" bg="bg-orange-50/80" onClick={onOutstandingClick} />
+          </div>
+          {/* Operational row */}
+          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+            <MetricCard label="New Members" value={String(d.newMembers)} icon={UserPlus} color="text-blue-700" bg="bg-blue-50/80" comparisonDelta={membersChange} prevLabel={prevLabel} />
+            <MetricCard label="Renewals" value={String(d.renewals)} icon={RefreshCw} color="text-purple-700" bg="bg-purple-50/80" comparisonDelta={renewalsChange} prevLabel={prevLabel} />
+            <MetricCard label="Payments Recorded" value={String(d.revenue.paymentCount)} icon={CreditCard} color="text-emerald-700" bg="bg-emerald-50/80" comparisonDelta={paymentsChange} prevLabel={prevLabel} />
+            <MetricCard label="Expenses Added" value={String(d.expenses.expenseCount)} icon={Receipt} color="text-rose-600" bg="bg-rose-50/80" comparisonDelta={expCountChange} prevLabel={prevLabel} invertTrend />
+          </div>
+        </div>
+      ) : null}
+    </SectionCard>
+  );
+}
+
+function MetricCard({ label, value, compactValue, icon: Icon, color, bg, onClick, comparison, comparisonDelta, prevLabel, invertTrend }: {
+  label: string; value: string; compactValue?: string; icon: React.ElementType;
+  color: string; bg: string; onClick?: () => void;
+  comparison?: { pct: string; dir: "up" | "down" | "flat" } | null;
+  comparisonDelta?: { delta: string; dir: "up" | "down" | "flat" } | null;
+  prevLabel?: string;
+  invertTrend?: boolean;
+}) {
+  const Wrapper = onClick ? "button" : "div";
+
+  const cmp = comparison || comparisonDelta;
+  let trendColor = "text-muted-foreground";
+  if (cmp && cmp.dir !== "flat") {
+    const isPositive = invertTrend ? cmp.dir === "down" : cmp.dir === "up";
+    trendColor = isPositive ? "text-green-600" : "text-red-500";
+  }
+
+  const showCompact = compactValue && compactValue !== value;
+
+  return (
+    <Wrapper
+      className={`flex flex-col justify-between rounded-xl md:rounded-2xl ${bg} text-left transition-all ${onClick ? "cursor-pointer hover:shadow-md" : ""}`}
+      style={{ padding: "clamp(0.75rem, 2.5vw, 1.25rem)" }}
+      onClick={onClick}
+    >
+      <div
+        className="flex items-center"
+        style={{ fontSize: "clamp(1.05rem, 4vw, 1.5rem)", gap: "0.35em" }}
+      >
+        <div
+          className="shrink-0 flex items-center justify-center rounded-full bg-white/90 shadow-sm"
+          style={{ width: "1.5em", height: "1.5em" }}
+        >
+          <Icon className={color} style={{ width: "0.7em", height: "0.7em" }} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p
+            className={`font-bold leading-tight tracking-tight whitespace-nowrap ${color}`}
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >{showCompact ? (<><span className="hidden md:inline">{value}</span><span className="md:hidden">{compactValue}</span></>) : value}</p>
+          <p className="font-medium text-muted-foreground" style={{ fontSize: "0.58em", marginTop: "0.15em" }}>{label}</p>
+        </div>
+      </div>
+      <div className="mt-2.5 md:mt-3.5">
+        {cmp && prevLabel && cmp.dir !== "flat" ? (
+          <div className="flex flex-wrap items-center gap-1 text-[10.5px] md:text-xs font-medium">
+            <span className="text-muted-foreground">{prevLabel}:</span>
+            <span className={`inline-flex items-center gap-0.5 ${trendColor}`}>
+              {cmp.dir === "up" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+              {comparison ? (comparison as { pct: string }).pct : (comparisonDelta as { delta: string }).delta}
+            </span>
+          </div>
+        ) : cmp && prevLabel ? (
+          <div className="flex items-center gap-1 text-[10.5px] md:text-xs font-medium text-muted-foreground">
+            <span>{prevLabel}:</span>
+            <span>{comparison ? "0%" : "0"}</span>
+          </div>
+        ) : (
+          <div className="h-4" />
+        )}
+      </div>
+    </Wrapper>
   );
 }
 
@@ -318,7 +412,7 @@ interface OutstandingSectionProps {
   isError: boolean;
   onRetry: () => void;
   onMemberClick: (memberId: string) => void;
-  onPayment: () => void;
+  onPayment: (memberId: string, membershipId: string) => void;
   onViewAll: () => void;
 }
 
@@ -382,11 +476,27 @@ function OutstandingSection({
             key={b.membershipId}
             title={b.memberName}
             subtitle={`${b.planName} · ${capitalize(b.status)}`}
-            value={formatMoney(b.outstanding)}
-            valueSubtitle="due"
             icon={Wallet}
             iconBg="bg-orange-100"
             iconColor="text-orange-700"
+            showChevron={false}
+            trailing={
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <p className="text-sm font-semibold tabular-nums text-red-600">{formatMoney(b.outstanding)}</p>
+                  <p className="text-xs text-muted-foreground">due</p>
+                </div>
+                <span
+                  role="link"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onPayment(b.memberId, b.membershipId); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onPayment(b.memberId, b.membershipId); } }}
+                  className="cursor-pointer rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Pay
+                </span>
+              </div>
+            }
             onClick={() => onMemberClick(b.memberId)}
           />
         ))}
@@ -403,9 +513,10 @@ interface AttentionSectionProps {
   isError: boolean;
   onRetry: () => void;
   onMemberClick: (memberId: string) => void;
+  onRenew: (membershipId: string) => void;
 }
 
-function AttentionSection({ expiring, isLoading, isError, onRetry, onMemberClick }: AttentionSectionProps) {
+function AttentionSection({ expiring, isLoading, isError, onRetry, onMemberClick, onRenew }: AttentionSectionProps) {
   if (isError) {
     return (
       <SectionCard title="Attention Required">
@@ -453,6 +564,7 @@ function AttentionSection({ expiring, isLoading, isError, onRetry, onMemberClick
             variant="destructive"
             members={expiring1Day.members}
             onMemberClick={onMemberClick}
+            onRenew={onRenew}
           />
         )}
         {expiring3Days.count > 0 && (
@@ -461,6 +573,7 @@ function AttentionSection({ expiring, isLoading, isError, onRetry, onMemberClick
             variant="warning"
             members={expiring3Days.members}
             onMemberClick={onMemberClick}
+            onRenew={onRenew}
           />
         )}
         {expiring7Days.count > expiring3Days.count && (
@@ -471,6 +584,7 @@ function AttentionSection({ expiring, isLoading, isError, onRetry, onMemberClick
               (m) => m.daysLeft > 3
             )}
             onMemberClick={onMemberClick}
+            onRenew={onRenew}
           />
         )}
       </div>
@@ -485,9 +599,10 @@ interface ExpiringGroupProps {
   variant: "destructive" | "warning" | "info";
   members: ExpiringMember[];
   onMemberClick: (memberId: string) => void;
+  onRenew: (membershipId: string) => void;
 }
 
-function ExpiringGroup({ label, variant, members, onMemberClick }: ExpiringGroupProps) {
+function ExpiringGroup({ label, variant, members, onMemberClick, onRenew }: ExpiringGroupProps) {
   if (members.length === 0) return null;
 
   const bgMap = {
@@ -518,8 +633,20 @@ function ExpiringGroup({ label, variant, members, onMemberClick }: ExpiringGroup
             icon={Users}
             iconBg="bg-white"
             iconColor={iconColorMap[variant]}
+            showChevron={false}
             trailing={
-              <DaysLeftBadge daysLeft={m.daysLeft} />
+              <div className="flex items-center gap-2">
+                <DaysLeftBadge daysLeft={m.daysLeft} />
+                <span
+                  role="link"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onRenew(m.membershipId); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onRenew(m.membershipId); } }}
+                  className="cursor-pointer rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Renew
+                </span>
+              </div>
             }
             onClick={() => onMemberClick(m.memberId)}
           />

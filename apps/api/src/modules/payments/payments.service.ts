@@ -5,6 +5,7 @@ import {
   lte,
   ilike,
   desc,
+  asc,
   count,
   sum,
   sql,
@@ -208,7 +209,7 @@ export async function getPaymentById(ctx: Ctx, paymentId: string) {
 
 export async function listPayments(ctx: Ctx, query: ListPaymentsQuery) {
   const { db, gymId } = ctx;
-  const { page, limit, memberId, membershipId, paymentMethod, dateFrom, dateTo, receiptNumber } = query;
+  const { page, limit, memberId, membershipId, paymentMethod, dateFrom, dateTo, receiptNumber, sortBy, sortOrder } = query;
 
   const conditions: SQL[] = [eq(payments.gymId, gymId)];
 
@@ -239,7 +240,14 @@ export async function listPayments(ctx: Ctx, query: ListPaymentsQuery) {
       .from(payments)
       .innerJoin(members, eq(payments.memberId, members.id))
       .where(where)
-      .orderBy(desc(payments.createdAt))
+      .orderBy((() => {
+        const dir = sortOrder === "asc" ? asc : desc;
+        switch (sortBy) {
+          case "paymentDate": return dir(payments.paymentDate);
+          case "amount": return dir(payments.amount);
+          default: return dir(payments.createdAt);
+        }
+      })())
       .limit(limit)
       .offset(offset),
     db.select({ total: count() }).from(payments).where(where),

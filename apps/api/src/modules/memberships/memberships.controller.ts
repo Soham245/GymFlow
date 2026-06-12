@@ -57,3 +57,9 @@ export const unfreeze = asyncHandler(async (req: Request, res: Response) => {
   const result = await svc.unfreezeMembership(ctx(req), req.params.id!, req.body);
   sendSuccess(res, result);
 });
+
+export const batchDelete = asyncHandler(async (req: Request, res: Response) => {
+  const { ids } = req.body;
+  const result = await svc.batchDeleteMemberships(ctx(req), ids);
+  sendSuccess(res, result);
+});

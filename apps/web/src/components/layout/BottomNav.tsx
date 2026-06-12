@@ -3,7 +3,7 @@ import {
   LayoutDashboard,
   Users,
   Wallet,
-  BarChart3,
+  Receipt,
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ const tabs = [
   { to: ROUTES.DASHBOARD, icon: LayoutDashboard, label: "Home" },
   { to: ROUTES.MEMBERS, icon: Users, label: "Members" },
   { to: ROUTES.PAYMENTS, icon: Wallet, label: "Payments" },
-  { to: ROUTES.REPORTS, icon: BarChart3, label: "Reports" },
+  { to: ROUTES.EXPENSES, icon: Receipt, label: "Expenses" },
 ] as const;
 
 export function BottomNav({ onMoreClick }: BottomNavProps) {

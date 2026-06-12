@@ -18,6 +18,8 @@ import { dashboardRouter } from "./modules/dashboard/dashboard.router.js";
 import { reportsRouter } from "./modules/reports/reports.router.js";
 import { automationRouter } from "./modules/automation/automation.router.js";
 import { exportsRouter } from "./modules/exports/exports.router.js";
+import { notificationsRouter } from "./modules/notifications/notifications.router.js";
+import { analyticsRouter } from "./modules/analytics/analytics.router.js";
 
 export const router = Router();
 
@@ -38,5 +40,7 @@ router.use("/payments", paymentsRouter);
 router.use("/expense-categories", expenseCategoriesRouter);
 router.use("/expenses", expensesRouter);
 router.use("/reports", reportsRouter);
+router.use("/reports/analytics", analyticsRouter);
 router.use("/automation", automationRouter);
 router.use("/exports", exportsRouter);
+router.use("/notifications", notificationsRouter);

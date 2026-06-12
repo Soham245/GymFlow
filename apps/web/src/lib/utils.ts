@@ -16,6 +16,16 @@ export function formatMoney(amount: string | number): string {
   return num < 0 ? `-₹${formatted}` : `₹${formatted}`;
 }
 
+export function formatCompactMoney(amount: string | number): string {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (isNaN(num)) return "₹0";
+  const abs = Math.abs(num);
+  const sign = num < 0 ? "-" : "";
+  if (abs >= 10_00_000) return `${sign}₹${(abs / 1_00_000).toFixed(1)}L`;
+  if (abs >= 1_00_000) return `${sign}₹${(abs / 1_00_000).toFixed(2)}L`;
+  return formatMoney(amount);
+}
+
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleDateString("en-IN", {

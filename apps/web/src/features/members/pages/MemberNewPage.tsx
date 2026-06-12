@@ -8,7 +8,6 @@ import {
   Calendar,
   MapPin,
   ShieldAlert,
-  CreditCard,
   Wallet,
   UserCheck,
   ChevronRight,
@@ -255,13 +254,6 @@ export default function MemberNewPage() {
           </p>
 
           <div className="mt-3 w-full max-w-xs space-y-2">
-            <NextStepButton
-              icon={CreditCard}
-              label="Create Membership"
-              description="Set up a membership plan for this member"
-              color="bg-primary text-primary-foreground"
-              onClick={() => navigate(ROUTES.MEMBER_DETAIL(createdMemberId))}
-            />
             <NextStepButton
               icon={Wallet}
               label="Record Payment"

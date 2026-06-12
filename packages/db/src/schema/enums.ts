@@ -69,6 +69,20 @@ export const notificationStatusEnum = pgEnum("notification_status", [
   "failed",
 ]);
 
+// ─── In-App Notification ────────────────────────────────────
+export const inAppNotificationTypeEnum = pgEnum("in_app_notification_type", [
+  "membership_expiring_7_days",
+  "membership_expiring_3_days",
+  "membership_expiring_today",
+  "membership_expired",
+  "outstanding_balance",
+  "freeze_ending",
+  "system",
+  "membership_auto_expired",
+  "membership_auto_unfrozen",
+  "daily_summary_available",
+]);
+
 // ─── Audit ──────────────────────────────────────────────────────
 export const auditActionEnum = pgEnum("audit_action", [
   "member_created",
@@ -80,6 +94,8 @@ export const auditActionEnum = pgEnum("audit_action", [
   "membership_cancelled",
   "membership_frozen",
   "membership_unfrozen",
+  "membership_auto_expired",
+  "membership_auto_unfrozen",
   "payment_created",
   "payment_updated",
   "payment_deleted",

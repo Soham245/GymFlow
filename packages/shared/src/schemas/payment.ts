@@ -18,6 +18,8 @@ export const listPaymentsSchema = paginationSchema.extend({
   dateFrom: dateStringSchema.optional(),
   dateTo: dateStringSchema.optional(),
   receiptNumber: z.string().max(50).optional(),
+  sortBy: z.enum(["paymentDate", "amount", "createdAt"]).default("paymentDate"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
 
 export const updatePaymentSchema = z.object({

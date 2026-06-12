@@ -6,3 +6,4 @@ export * from "./payment.js";
 export * from "./expense.js";
 export * from "./report.js";
 export * from "./messaging.js";
+export * from "./notification.js";

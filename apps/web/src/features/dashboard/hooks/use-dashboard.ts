@@ -5,6 +5,7 @@ import { queryKeys } from "@/lib/query-keys";
 import type {
   ApiResponse,
   DashboardData,
+  DailySummary,
   ExpiringMembershipsData,
   OutstandingBalancesData,
 } from "@/api/types";
@@ -42,6 +43,59 @@ export function useExpiringMemberships() {
     },
     staleTime: 5 * 60_000,
     retry: 2,
+  });
+}
+
+function buildDateRange(range: "today" | "last7days" | "last30days") {
+  const today = new Date().toISOString().slice(0, 10);
+  if (range === "today") return {};
+  const d = new Date();
+  d.setDate(d.getDate() - (range === "last7days" ? 6 : 29));
+  return { from: d.toISOString().slice(0, 10), to: today };
+}
+
+function buildPrevDateRange(range: "today" | "last7days" | "last30days") {
+  if (range === "today") {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const yesterday = d.toISOString().slice(0, 10);
+    return { from: yesterday, to: yesterday };
+  }
+  const span = range === "last7days" ? 7 : 30;
+  const end = new Date();
+  end.setDate(end.getDate() - span);
+  const start = new Date(end);
+  start.setDate(start.getDate() - (span - 1));
+  return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+}
+
+function toQs(params: Record<string, string | undefined>) {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
+  return sp.toString();
+}
+
+async function fetchSummary(qs: string) {
+  const url = qs ? `${AUTOMATION.DAILY_SUMMARY}?${qs}` : AUTOMATION.DAILY_SUMMARY;
+  const res = await api.get<ApiResponse<DailySummary>>(url);
+  return res.data.data;
+}
+
+export function useActivitySummary(range: "today" | "last7days" | "last30days" = "today") {
+  return useQuery({
+    queryKey: [...queryKeys.automation.summary, range],
+    queryFn: () => fetchSummary(toQs(buildDateRange(range))),
+    staleTime: 2 * 60_000,
+    retry: 2,
+  });
+}
+
+export function useActivitySummaryPrev(range: "today" | "last7days" | "last30days" = "today") {
+  return useQuery({
+    queryKey: [...queryKeys.automation.summary, range, "prev"],
+    queryFn: () => fetchSummary(toQs(buildPrevDateRange(range))),
+    staleTime: 5 * 60_000,
+    retry: 1,
   });
 }
 

@@ -16,12 +16,14 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { ROUTES } from "@/lib/constants";
+import { useUnreadCount } from "@/features/notifications/hooks/use-notifications";
 
 interface SidebarItem {
   to: string;
   icon: React.ElementType;
   label: string;
   soon?: boolean;
+  badge?: number;
 }
 
 const mainItems: SidebarItem[] = [
@@ -35,12 +37,12 @@ const mainItems: SidebarItem[] = [
 
 const secondaryItems: SidebarItem[] = [
   { to: ROUTES.SETTINGS, icon: Settings, label: "Settings" },
-  { to: ROUTES.NOTIFICATIONS, icon: Bell, label: "Notifications", soon: true },
+  { to: ROUTES.NOTIFICATIONS, icon: Bell, label: "Notifications" },
   { to: ROUTES.MESSAGES, icon: MessageSquare, label: "Messages", soon: true },
   { to: ROUTES.LEADS, icon: UserPlus, label: "Leads", soon: true },
 ];
 
-function SideNavLink({ to, icon: Icon, label, soon }: SidebarItem) {
+function SideNavLink({ to, icon: Icon, label, soon, badge }: SidebarItem) {
   return (
     <NavLink
       to={to}
@@ -62,64 +64,74 @@ function SideNavLink({ to, icon: Icon, label, soon }: SidebarItem) {
           Soon
         </Badge>
       )}
+      {!soon && badge !== undefined && badge > 0 && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </NavLink>
   );
 }
 
 export function Sidebar() {
   const { user, logout } = useAuth();
+  const unreadCount = useUnreadCount();
+
+  const resolvedSecondary = secondaryItems.map((item) =>
+    item.to === ROUTES.NOTIFICATIONS
+      ? { ...item, badge: unreadCount.data ?? 0 }
+      : item
+  );
 
   return (
-    <aside className="hidden md:flex md:w-60 md:flex-col md:border-r md:bg-sidebar-background">
-      <div className="flex h-full flex-col">
-        {/* Logo */}
-        <div className="flex h-14 items-center gap-2 border-b px-4">
-          <img
-            src="/logo.png"
-            alt="GymFlow"
-            className="h-8 w-8 rounded"
-          />
-          <span className="text-lg font-semibold">GymFlow</span>
-        </div>
+    <aside className="hidden md:flex md:w-60 md:shrink-0 md:flex-col md:border-r md:bg-sidebar-background md:h-screen md:sticky md:top-0">
+      {/* Logo — fixed at top */}
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+        <img
+          src="/logo.png"
+          alt="GymFlow"
+          className="h-8 w-8 rounded"
+        />
+        <span className="text-lg font-semibold">GymFlow</span>
+      </div>
 
-        {/* Main nav */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {mainItems.map((item) => (
-            <SideNavLink key={item.to} {...item} />
-          ))}
+      {/* Navigation — scrollable if items overflow */}
+      <nav className="flex-1 overflow-y-auto space-y-1 px-3 py-4">
+        {mainItems.map((item) => (
+          <SideNavLink key={item.to} {...item} />
+        ))}
 
-          <div className="my-3 border-t" />
+        <div className="my-3 border-t" />
 
-          {secondaryItems.map((item) => (
-            <SideNavLink key={item.to} {...item} />
-          ))}
-        </nav>
+        {resolvedSecondary.map((item) => (
+          <SideNavLink key={item.to} {...item} />
+        ))}
+      </nav>
 
-        {/* User section */}
-        <div className="border-t p-3">
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-              {user?.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase()}
-            </div>
-            <div className="flex-1 truncate">
-              <p className="text-sm font-medium truncate">{user?.name}</p>
-              <p className="text-xs text-muted-foreground capitalize">
-                {user?.role}
-              </p>
-            </div>
-            <button
-              onClick={() => logout()}
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+      {/* User section — pinned at bottom */}
+      <div className="shrink-0 border-t p-3">
+        <div className="flex items-center gap-3 rounded-lg px-3 py-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+            {user?.name
+              .split(" ")
+              .map((n) => n[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase()}
           </div>
+          <div className="flex-1 truncate">
+            <p className="text-sm font-medium truncate">{user?.name}</p>
+            <p className="text-xs text-muted-foreground capitalize">
+              {user?.role}
+            </p>
+          </div>
+          <button
+            onClick={() => logout()}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            title="Logout"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </aside>

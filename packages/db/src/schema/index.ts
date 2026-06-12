@@ -8,4 +8,5 @@ export * from "./expenses.js";
 export * from "./audit.js";
 export * from "./notifications.js";
 export * from "./messaging.js";
+export * from "./in-app-notifications.js";
 export * from "./relations.js";

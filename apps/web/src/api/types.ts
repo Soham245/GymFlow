@@ -170,6 +170,12 @@ export interface MemberListItem {
   status: "active" | "expired" | "inactive" | "frozen";
   photoUrl?: string | null;
   createdAt: string;
+  latestMembership?: {
+    planName: string;
+    startDate: string;
+    endDate: string;
+    status: "active" | "expired" | "cancelled" | "frozen";
+  } | null;
 }
 
 export interface MemberNote {
@@ -310,6 +316,128 @@ export interface ExpenseCategory {
   name: string;
   description?: string | null;
   isActive: boolean;
+}
+
+// ─── Notifications ────────────────────────────────────────────
+
+export type InAppNotificationType =
+  | "membership_expiring_7_days"
+  | "membership_expiring_3_days"
+  | "membership_expiring_today"
+  | "membership_expired"
+  | "outstanding_balance"
+  | "freeze_ending"
+  | "system"
+  | "membership_auto_expired"
+  | "membership_auto_unfrozen"
+  | "daily_summary_available";
+
+export interface InAppNotification {
+  id: string;
+  gymId: string;
+  type: InAppNotificationType;
+  title: string;
+  message: string;
+  relatedEntityType?: string | null;
+  relatedEntityId?: string | null;
+  isRead: boolean;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+// ─── Daily Summary ────────────────────────────────────────────
+
+export interface DailySummary {
+  generatedAt: string;
+  from: string;
+  to: string;
+  isRange: boolean;
+  revenue: { total: string; paymentCount: number };
+  expenses: { total: string; expenseCount: number };
+  profit: string;
+  newMembers: number;
+  renewals: number;
+}
+
+// ─── Unified Analytics ────────────────────────────────────────
+
+export interface TrendChange {
+  pct: number;
+  dir: "up" | "down" | "flat";
+}
+
+export interface AnalyticsData {
+  period: { from: string; to: string; range: string };
+  previousPeriod: { from: string; to: string };
+  revenue: {
+    totalRevenue: string;
+    paymentCount: number;
+    averagePayment: string;
+    paymentMethodBreakdown: Array<{ method: string; total: string; count: number }>;
+    change: TrendChange;
+    previousTotal: string;
+  };
+  expenses: {
+    totalExpenses: string;
+    expenseCount: number;
+    categoryBreakdown: Array<{ category: string; total: string; count: number }>;
+    change: TrendChange;
+    previousTotal: string;
+  };
+  profit: {
+    revenue: string;
+    expenses: string;
+    profit: string;
+    margin: number;
+    change: TrendChange;
+    previousProfit: string;
+    marginChange: TrendChange;
+    previousMargin: number;
+  };
+  memberships: {
+    active: number;
+    frozen: number;
+    expired: number;
+    cancelled: number;
+    expiring7Days: number;
+    expiring30Days: number;
+    expiringMemberships: Array<{
+      membershipId: string;
+      memberId: string;
+      memberName: string;
+      memberPhone: string;
+      planName: string;
+      endDate: string;
+      daysLeft: number;
+    }>;
+  };
+  outstanding: {
+    totalOutstanding: string;
+    membersWithDues: number;
+    balances: Array<{
+      membershipId: string;
+      memberId: string;
+      memberName: string;
+      memberPhone: string;
+      planName: string;
+      totalAmount: string;
+      discountAmount: string;
+      paidAmount: string;
+      outstanding: string;
+      status: string;
+      endDate: string;
+    }>;
+  };
+  trends: Array<{
+    month: string;
+    revenue: string;
+    expenses: string;
+    profit: string;
+    paymentCount: number;
+    expenseCount: number;
+    newMembers: number;
+    renewals: number;
+  }>;
 }
 
 // ─── Plans ─────────────────────────────────────────────────────

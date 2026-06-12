@@ -8,4 +8,5 @@ export const automationRouter = Router();
 automationRouter.get("/expiring-memberships", authorize("owner"), controller.expiringMemberships);
 automationRouter.get("/expired-memberships", authorize("owner"), controller.expiredMemberships);
 automationRouter.get("/daily-summary", authorize("owner"), controller.dailySummary);
+automationRouter.post("/generate-daily-summary", authorize("owner"), controller.generateDailySummary);
 automationRouter.get("/backup-status", authorize("owner"), controller.backupStatus);

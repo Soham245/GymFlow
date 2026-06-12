@@ -63,7 +63,7 @@ const SystemInfoPage = lazy(() => import("@/features/settings/pages/SystemInfoPa
 const TemplatesPage = lazy(() => import("@/features/messaging/pages/TemplatesPage"));
 const ScheduledPage = lazy(() => import("@/features/messaging/pages/ScheduledPage"));
 const MessageHistoryPage = lazy(() => import("@/features/messaging/pages/MessageHistoryPage"));
-const NotificationsPage = lazy(() => import("@/features/messaging/pages/NotificationsPage"));
+const NotificationsPage = lazy(() => import("@/features/notifications/pages/NotificationsPage"));
 const LeadsPage = lazy(() => import("@/features/messaging/pages/LeadsPage"));
 
 // ---------------------------------------------------------------------------

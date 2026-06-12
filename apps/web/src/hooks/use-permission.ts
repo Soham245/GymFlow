@@ -7,12 +7,14 @@ export type Action =
   | "members:status"
   | "members:notes"
   | "memberships:create"
+  | "memberships:delete"
   | "memberships:freeze"
   | "payments:create"
   | "payments:delete"
   | "payments:void"
   | "expenses:create"
   | "expenses:edit"
+  | "expenses:delete"
   | "plans:manage"
   | "categories:manage"
   | "settings:gym"
@@ -29,12 +31,14 @@ const ROLE_PERMISSIONS: Record<UserRole, Action[]> = {
     "members:status",
     "members:notes",
     "memberships:create",
+    "memberships:delete",
     "memberships:freeze",
     "payments:create",
     "payments:delete",
     "payments:void",
     "expenses:create",
     "expenses:edit",
+    "expenses:delete",
     "plans:manage",
     "categories:manage",
     "settings:gym",

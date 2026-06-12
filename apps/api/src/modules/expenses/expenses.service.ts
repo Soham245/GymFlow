@@ -4,6 +4,7 @@ import {
   gte,
   lte,
   ilike,
+  inArray,
   asc,
   desc,
   count,
@@ -179,6 +180,47 @@ export async function updateExpense(ctx: Ctx, expenseId: string, input: UpdateEx
   return updated!;
 }
 
+// ─── Batch Delete Expenses ──────────────────────────────────────
+
+export async function batchDeleteExpenses(ctx: Ctx, expenseIds: string[]) {
+  const { db, gymId, userId } = ctx;
+
+  if (expenseIds.length === 0) return { deleted: 0 };
+  if (expenseIds.length > 50) {
+    throw AppError.badRequest("Cannot delete more than 50 expenses at once");
+  }
+
+  // Verify all expenses belong to this gym
+  const existing = await db
+    .select({ id: expenses.id, description: expenses.description, amount: expenses.amount })
+    .from(expenses)
+    .where(and(eq(expenses.gymId, gymId), inArray(expenses.id, expenseIds)));
+
+  if (existing.length !== expenseIds.length) {
+    throw AppError.badRequest(
+      "Some expense IDs are invalid or don't belong to this gym"
+    );
+  }
+
+  await db.delete(expenses).where(inArray(expenses.id, expenseIds));
+
+  for (const exp of existing) {
+    await createAuditLog(db, {
+      gymId,
+      userId,
+      action: "expense_deleted",
+      entityType: "expense",
+      entityId: exp.id,
+      oldValues: { description: exp.description, amount: exp.amount },
+      newValues: null,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
+    });
+  }
+
+  return { deleted: existing.length };
+}
+
 // ─── List ───────────────────────────────────────────────────────
 
 export async function listExpenses(ctx: Ctx, query: ListExpensesQuery) {
@@ -187,7 +229,14 @@ export async function listExpenses(ctx: Ctx, query: ListExpensesQuery) {
 
   const conditions: SQL[] = [eq(expenses.gymId, gymId)];
 
-  if (categoryId) conditions.push(eq(expenses.categoryId, categoryId));
+  if (categoryId) {
+    const ids = categoryId.split(",").filter(Boolean);
+    if (ids.length === 1) {
+      conditions.push(eq(expenses.categoryId, ids[0]!));
+    } else if (ids.length > 1) {
+      conditions.push(inArray(expenses.categoryId, ids));
+    }
+  }
   if (dateFrom) conditions.push(gte(expenses.expenseDate, dateFrom));
   if (dateTo) conditions.push(lte(expenses.expenseDate, dateTo));
   if (search) conditions.push(ilike(expenses.description, `%${search}%`));
